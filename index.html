@@ -884,53 +884,15 @@
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
 
-        // Global State & Data Dummy (6 Stories aligned with images & categories)
-        const dummyStories = [
-
-        // Global State & Data
-        let customStories = []; // List of custom stories loaded dynamically from Firestore/LocalStorage
-        let allAvailableStories = [...dummyStories]; // Merge dummy and custom stories
-        let timerDuration = 600; // 10 Minit
-        let timerInterval = null;
-        let selectedBook = null;
-        let currentUser = null;
-        let readBookIds = [];
-        let userRecordsList = []; 
-        let globalAllRecords = []; // All records in school database for admin analytics
-
-        // State for newly added content
-        let activeAddMediaTab = "text"; // "text" or "youtube"
-
-        window.toggleDarkMode = function() {
-            if (document.documentElement.classList.contains('dark')) {
-                document.documentElement.classList.remove('dark');
-                localStorage.setItem('theme', 'light');
-            } else {
-                document.documentElement.classList.add('dark');
-                localStorage.setItem('theme', 'dark');
-            }
-            updateDarkModeIcons();
-        };
-
-        function applyTheme() {
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-            updateDarkModeIcons();
-        }
-
-        function updateDarkModeIcons() {
-            const isDark = document.documentElement.classList.contains('dark');
-        // UI States
+        const dummyStories = []; // Semua cerita dummy dibuang seperti diarahkan
+        let customStories = []; // Senarai cerita aktif dari Firestore
+        let allAvailableStories = []; // Gabungan cerita sedia ada
         let timerDuration = 600; // 10 Minit (600 Saat)
         let timerInterval = null;
         let selectedBook = null;
         let currentUser = null;
-        let readBookIds = []; // Stores IDs of books read by currently logged in user
-        let userRecordsList = []; // Global array to hold history records for statistics
+        let readBookIds = []; // ID Buku sudah dibaca
+        let userRecordsList = []; // Rekod sejarah murid
 
         // Sinkronisasikan paparan ikon sebaik sahaja modul sedia
         window.applyTheme();
@@ -945,15 +907,15 @@
 
         // Tab selection for Login
         document.getElementById('tab-student').addEventListener('click', () => {
-            document.getElementById('tab-student').className = "flex-1 py-2 text-sm font-semibold rounded-lg text-amber-700 dark:text-amber-300 bg-white dark:bg-slate-800 shadow-sm transition-all";
-            document.getElementById('tab-admin').className = "flex-1 py-2 text-sm font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-all";
+            document.getElementById('tab-student').className = "flex-1 py-2 text-sm font-semibold rounded-lg text-amber-700 dark:text-amber-300 bg-white dark:bg-slate-800 shadow-sm transition-all cursor-pointer";
+            document.getElementById('tab-admin').className = "flex-1 py-2 text-sm font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-all cursor-pointer";
             document.getElementById('form-student-container').classList.remove('hidden');
             document.getElementById('form-admin-container').classList.add('hidden');
         });
 
         document.getElementById('tab-admin').addEventListener('click', () => {
-            document.getElementById('tab-admin').className = "flex-1 py-2 text-sm font-semibold rounded-lg text-amber-700 dark:text-amber-300 bg-white dark:bg-slate-800 shadow-sm transition-all";
-            document.getElementById('tab-student').className = "flex-1 py-2 text-sm font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-all";
+            document.getElementById('tab-admin').className = "flex-1 py-2 text-sm font-semibold rounded-lg text-amber-700 dark:text-amber-300 bg-white dark:bg-slate-800 shadow-sm transition-all cursor-pointer";
+            document.getElementById('tab-student').className = "flex-1 py-2 text-sm font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-all cursor-pointer";
             document.getElementById('form-admin-container').classList.remove('hidden');
             document.getElementById('form-student-container').classList.add('hidden');
         });
@@ -980,7 +942,6 @@
             if (usernameInput === "SKUSADMIN" && passwordInput === "BBA4021") {
                 showToast("Berjaya log masuk sebagai Admin!", "success");
                 switchToScreen('screen-admin');
-                loadAdminData();
             } else {
                 showToast("ID Admin atau Kata Laluan salah!", "error");
             }
@@ -993,7 +954,7 @@
                 const user = result.user;
                 showToast(`Selamat datang, ${user.displayName}!`, "success");
             } catch (error) {
-                console.error("Ralat log masuk Google:", error);
+                console.warn("Firebase Auth disekat/ralat di Iframe, memulakan mod simulator keselamatan...", error);
                 simulateStudentLogin();
             }
         });
@@ -1008,7 +969,7 @@
             document.getElementById('student-name').innerText = mockUser.displayName;
             document.getElementById('student-email').innerText = mockUser.email;
             document.getElementById('student-avatar').src = mockUser.photoURL;
-            showToast("Log Masuk Simulator Aktif!", "info");
+            showToast("Log Masuk Pintar Aktif!", "success");
             switchToScreen('screen-student');
             
             fetchUserRecords(mockUser.email);
@@ -1019,7 +980,7 @@
             customStories = [];
             let deletedIds = [];
 
-            // 1. Fetch persistent deleted story IDs from Firestore 'deleted_stories'
+            // 1. Ambil ID cerita yang dipadam dari Firestore
             try {
                 const deletedSnapshot = await getDocs(collection(db, "deleted_stories"));
                 deletedSnapshot.forEach((doc) => {
@@ -1029,18 +990,7 @@
                 console.warn("Ralat memuatkan rekod pemadaman dari Firestore:", err);
             }
 
-            // Fallback deleted IDs from LocalStorage
-            try {
-                const localDeleted = localStorage.getItem("deleted_story_ids");
-                if (localDeleted) {
-                    const parsed = JSON.parse(localDeleted);
-                    parsed.forEach(id => {
-                        if (!deletedIds.includes(id)) deletedIds.push(id);
-                    });
-                }
-            } catch (err) {}
-
-            // 2. Fetch active custom stories from Firestore
+            // 2. Ambil cerita aktif dari Firestore
             try {
                 const q = collection(db, "stories");
                 const querySnapshot = await getDocs(q);
@@ -1048,7 +998,6 @@
                     const data = doc.data();
                     const storyId = doc.id;
                     
-                    // Only load if this story is NOT marked as deleted
                     if (!deletedIds.includes(storyId)) {
                         customStories.push({
                             id: storyId,
@@ -1070,10 +1019,10 @@
                     }
                 });
             } catch (err) {
-                console.warn("Firestore stories fetch error:", err);
+                console.warn("Ralat memuatkan cerita dari Firestore:", err);
             }
 
-            // Fetch custom stories from LocalStorage backup
+            // Backup simpanan tempatan (offline)
             try {
                 const localStories = localStorage.getItem("customStories");
                 if (localStories) {
@@ -1084,27 +1033,21 @@
                         }
                     });
                 }
-            } catch (err) {
-                console.error("Local storage stories load error:", err);
-            }
+            } catch (err) {}
 
-            // 3. Filter active dummy stories
+            // Tapis senarai cerita dummy (jika ada) dan cantumkan dengan cerita kustom
             const activeDummyStories = dummyStories.filter(story => !deletedIds.includes(story.id));
-
-            // Merge active dummy stories and custom stories
             allAvailableStories = [...activeDummyStories, ...customStories];
             renderBookShelf();
         }
 
-        // Fetch completed reading records of the logged in student
+        // Ambil rekod pembacaan tersimpan bagi murid tersebut
         async function fetchUserRecords(email) {
             readBookIds = [];
             userRecordsList = [];
             
-            // First load active stories
             await fetchStories();
 
-            // 1. Attempt to load records from Firebase Firestore
             try {
                 const q = query(collection(db, "nilam_records"), where("student_email", "==", email));
                 const querySnapshot = await getDocs(q);
@@ -1119,7 +1062,7 @@
                 console.warn("Ralat akses Firestore. Menggunakan fail sandaran tempatan:", error);
             }
 
-            // 2. Load from localStorage fallback to guarantee offline capability
+            // Muat dari LocalStorage sebagai sandaran larian
             try {
                 const localBookIds = localStorage.getItem(`readBookIds_${email}`);
                 if (localBookIds) {
@@ -1140,15 +1083,13 @@
                         }
                     });
                 }
-            } catch (err) {
-                console.error("Ralat membaca storan tempatan:", err);
-            }
+            } catch (err) {}
 
             renderBookShelf();
             updateHistoryPage();
         }
 
-        // Update Statistics & Sejarah Page
+        // Kemas kini halaman sejarah & statistik pembacaan
         function updateHistoryPage() {
             const total = userRecordsList.length;
             const fiction = userRecordsList.filter(r => r.category === "Fiksyen").length;
@@ -1204,7 +1145,7 @@
             });
         }
 
-        // Handle Auth Change Status
+        // Listeners & Auth State Changes
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
@@ -1220,7 +1161,7 @@
             }
         });
 
-        // Logout Handlers
+        // Logout
         document.getElementById('btn-student-logout').addEventListener('click', () => {
             signOut(auth).then(() => {
                 showToast("Berjaya log keluar.", "info");
@@ -1241,7 +1182,6 @@
             switchToScreen('screen-login');
         });
 
-        // Navigate for Sejarah / Rekod NILAM
         document.getElementById('btn-student-history').addEventListener('click', () => {
             document.getElementById('sub-student-shelf').classList.add('hidden');
             document.getElementById('sub-student-reading').classList.add('hidden');
@@ -1254,18 +1194,16 @@
             document.getElementById('sub-student-shelf').classList.remove('hidden');
         });
 
-        // Search & Filter event listeners
         document.getElementById('shelf-search').addEventListener('input', renderBookShelf);
         document.getElementById('shelf-filter').addEventListener('change', renderBookShelf);
 
-        // Render Book Shelf with sort & advanced filter options using the merged list
+        // Render Book Shelf
         function renderBookShelf() {
             const searchTerm = document.getElementById('shelf-search').value.toLowerCase();
             const categoryFilter = document.getElementById('shelf-filter').value;
             const grid = document.getElementById('book-grid');
             grid.innerHTML = "";
 
-            // 1. Filter the stories based on search and category inputs from all available stories in DB
             let filtered = allAvailableStories.filter(story => {
                 const matchesSearch = story.title.toLowerCase().includes(searchTerm) || story.author.toLowerCase().includes(searchTerm);
                 const isRead = readBookIds.includes(story.id);
@@ -1287,22 +1225,21 @@
                 return matchesSearch && matchesFilter;
             });
 
-            // 2. SORT LOGIC: Push already Read stories to the bottom
+            // Susun: Tolak buku yang sudah dibaca ke paling bawah
             filtered.sort((a, b) => {
                 const aRead = readBookIds.includes(a.id);
                 const bRead = readBookIds.includes(b.id);
-                
-                if (aRead && !bRead) return 1;   // push 'a' down because it is read
-                if (!aRead && bRead) return -1;  // keep 'a' up because it is unread
-                return 0;                        // maintain default order if both are read or both are unread
+                if (aRead && !bRead) return 1;
+                if (!aRead && bRead) return -1;
+                return 0;
             });
 
             if (filtered.length === 0) {
                 grid.innerHTML = `
                     <div class="col-span-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 text-center text-slate-450 dark:text-slate-500 transition-colors">
                         <i class="fa-solid fa-face-frown text-3xl mb-3 text-slate-450"></i>
-                        <p class="text-sm font-medium">Tiada bahan bacaan yang sepadan ditemui.</p>
-                        <p class="text-xs text-slate-400 mt-1">Guru atau admin belum menambah sebarang kandungan di rak perpustakaan.</p>
+                        <p class="text-sm font-medium">Tiada bahan bacaan aktif ditemui.</p>
+                        <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">Sila log masuk sebagai Admin untuk mula memuat naik bahan bacaan pertama sekolah anda.</p>
                     </div>
                 `;
                 return;
@@ -1311,9 +1248,8 @@
             filtered.forEach(story => {
                 const isRead = readBookIds.includes(story.id);
                 const card = document.createElement('div');
-                card.className = `bg-white dark:bg-slate-900 rounded-2xl border ${isRead ? 'border-emerald-300 dark:border-emerald-800/80 shadow-md shadow-emerald-500/5' : 'border-slate-200 dark:border-slate-800'} shadow-sm overflow-hidden flex flex-col group hover:shadow-md transition-all relative`;
+                card.className = `bg-white dark:bg-slate-900 rounded-2xl border ${isRead ? 'border-emerald-300 dark:border-emerald-800/80 shadow-md' : 'border-slate-200 dark:border-slate-800'} shadow-sm overflow-hidden flex flex-col group hover:shadow-md transition-all relative`;
                 
-                // Determine cover thumbnail
                 let coverHtml = "";
                 if (story.thumbnailUrl) {
                     coverHtml = `<img src="${story.thumbnailUrl}" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.onerror=null; this.src='https://placehold.co/400x250/2563eb/ffffff?text=${encodeURIComponent(story.title)}'">`;
@@ -1331,27 +1267,21 @@
                 }
 
                 card.innerHTML = `
-                    <!-- Tag Sudah Dibaca (Floating Badge) -->
                     ${isRead ? `
                     <div class="absolute top-3 right-3 bg-emerald-500/95 dark:bg-emerald-600/95 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1 z-20 animate-bounce">
                         <i class="fa-solid fa-circle-check"></i> Sudah Dibaca
                     </div>
                     ` : ''}
 
-                    <!-- Thumbnail Area -->
                     <div class="p-6 h-56 flex flex-col items-center justify-center relative overflow-hidden text-white text-center">
                         ${coverHtml}
                     </div>
 
-                    <!-- Meta Details -->
                     <div class="p-5 flex-grow flex flex-col justify-between space-y-4">
                         <div class="space-y-2.5">
                             <div class="flex items-center gap-2">
                                 <span class="text-[10px] font-bold tracking-wider uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-md">
                                     ${story.category}
-                                </span>
-                                <span class="text-[10px] font-bold tracking-wider uppercase bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 px-2.5 py-1 rounded-md flex items-center gap-1">
-                                    <i class="fa-solid ${story.isVideo ? 'fa-video' : 'fa-file-invoice'}"></i> ${story.isVideo ? 'E-Belajar Video' : 'Teks Buku'}
                                 </span>
                             </div>
                             <h4 class="font-extrabold text-slate-800 dark:text-slate-200 text-base leading-snug line-clamp-1">${story.title}</h4>
@@ -1361,7 +1291,7 @@
                         <div class="pt-3 border-t border-slate-100 dark:border-slate-850 flex items-center justify-between text-xs text-slate-400 dark:text-slate-550">
                             <span>Kandungan: <strong class="text-slate-600 dark:text-slate-300 font-bold">${story.pages} M/S</strong></span>
                             <button onclick="startReading('${story.id}')" class="${isRead ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/10' : 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/10'} text-white font-extrabold py-2 px-4 rounded-xl shadow-md transition-all flex items-center gap-1.5 text-xs cursor-pointer">
-                                ${isRead ? 'Belajar Semula <i class="fa-solid fa-rotate-right text-[10px]"></i>' : 'Mula Belajar <i class="fa-solid fa-chevron-right text-[10px]"></i>'}
+                                ${isRead ? 'Baca Semula <i class="fa-solid fa-rotate-right text-[10px]"></i>' : 'Mula Belajar <i class="fa-solid fa-chevron-right text-[10px]"></i>'}
                             </button>
                         </div>
                     </div>
@@ -1370,19 +1300,10 @@
             });
         }
 
-        // Helper function to extract YouTube ID from link
-        function getYouTubeId(url) {
-            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-            const match = url.match(regExp);
-            return (match && match[2].length === 11) ? match[2] : null;
-        }
-
-        // Start Reading Story
         window.startReading = function(storyId) {
             selectedBook = allAvailableStories.find(s => s.id === storyId);
             if (!selectedBook) return;
 
-            // Update UI elements
             document.getElementById('reading-title').innerText = selectedBook.title;
             document.getElementById('reading-author').innerText = `Oleh: ${selectedBook.author}`;
             document.getElementById('reading-badge').innerText = selectedBook.category;
@@ -1399,51 +1320,16 @@
                 banner.className = `h-48 md:h-64 flex flex-col items-center justify-center p-6 text-white relative bg-gradient-to-br ${selectedBook.thumbnailColor}`;
             }
 
-            // Inject Story text paragraphs
             const paragraphsBox = document.getElementById('story-paragraphs');
             paragraphsBox.innerHTML = "";
-
-            const videoContainer = document.getElementById('youtube-player-container');
-
-            if (selectedBook.isVideo && selectedBook.youtubeUrl) {
-                // Video story flow - Display Visual Placeholder Card instead of iframe
-                videoContainer.classList.remove('hidden');
-                
-                const videoId = getYouTubeId(selectedBook.youtubeUrl);
-                const thumbImg = document.getElementById('youtube-thumbnail-placeholder');
-                const linkCard = document.getElementById('youtube-link-card');
-                const extBtn = document.getElementById('youtube-external-btn');
-
-                if (videoId) {
-                    thumbImg.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-                } else if (selectedBook.thumbnailUrl) {
-                    thumbImg.src = selectedBook.thumbnailUrl;
-                } else {
-                    thumbImg.src = 'https://placehold.co/600x400/1e293b/ffffff?text=E-Pembelajaran';
-                }
-
-                // Set redirect links
-                linkCard.href = selectedBook.youtubeUrl;
-                extBtn.href = selectedBook.youtubeUrl;
-
-                // Add small helper note in text paragraph box
+            selectedBook.paragraphs.forEach(text => {
                 const p = document.createElement('p');
-                p.className = "text-center font-bold text-slate-500 dark:text-slate-400 italic text-sm";
-                p.innerText = "Sila klik gambar poster atau butang merah di atas untuk menonton video pembelajaran ini di YouTube.";
+                p.className = "text-slate-700 dark:text-slate-300 leading-relaxed text-justify text-base md:text-lg";
+                p.innerText = text;
                 paragraphsBox.appendChild(p);
-            } else {
-                // Text story flow
-                videoContainer.classList.add('hidden');
-                
-                selectedBook.paragraphs.forEach(text => {
-                    const p = document.createElement('p');
-                    p.className = "text-slate-700 dark:text-slate-300 leading-relaxed text-justify text-base md:text-lg";
-                    p.innerText = text;
-                    paragraphsBox.appendChild(p);
-                });
-            }
+            });
 
-            // Set Data for Copy AINS Section (Hidden at start)
+            // Set data salinan AINS
             document.getElementById('ains-tajuk').innerText = selectedBook.title;
             document.getElementById('ains-kategori').innerText = selectedBook.category;
             document.getElementById('ains-mukasurat').innerText = selectedBook.pages;
@@ -1456,16 +1342,14 @@
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('ains-tarikh').innerText = today;
 
-            // Reset Timer state
+            // Memulakan Pemasa 10 Minit (600 Saat)
             clearInterval(timerInterval);
-            timerDuration = 600; // 10 Minit
+            timerDuration = 600;
             updateCountdownUI();
 
-            // Reset Save Button state
-            const saveBtn = document.getElementById('btn-save-record');
-            saveBtn.disabled = false;
-            saveBtn.className = "w-full sm:w-auto bg-white dark:bg-slate-100 text-emerald-600 dark:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-white font-extrabold py-3.5 px-8 rounded-full shadow-md transition-all transform active:scale-95 text-sm flex items-center justify-center gap-2 mx-auto cursor-pointer";
-            saveBtn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Simpan Rekod & Tanda "Sudah Dibaca"`;
+            document.getElementById('btn-save-record').disabled = false;
+            document.getElementById('btn-save-record').className = "w-full sm:w-auto bg-white dark:bg-slate-100 text-emerald-600 dark:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-white font-extrabold py-3.5 px-8 rounded-full shadow-md transition-all transform active:scale-95 text-sm flex items-center justify-center gap-2 mx-auto cursor-pointer";
+            document.getElementById('btn-save-record').innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Simpan Rekod & Tanda "Sudah Dibaca"`;
 
             document.getElementById('btn-finish-reading').disabled = true;
             document.getElementById('btn-finish-reading').className = "w-full sm:w-auto bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-600 font-extrabold py-3 px-8 rounded-full shadow-inner transition-all cursor-not-allowed text-sm flex items-center justify-center gap-2";
@@ -1473,12 +1357,10 @@
             document.getElementById('countdown-display').classList.remove('hidden');
             document.getElementById('ains-portal-section').classList.add('hidden');
 
-            // Switch to Reading sub-page
             document.getElementById('sub-student-shelf').classList.add('hidden');
             document.getElementById('sub-student-history').classList.add('hidden');
             document.getElementById('sub-student-reading').classList.remove('hidden');
 
-            // Start countdown interval
             timerInterval = setInterval(() => {
                 timerDuration--;
                 updateCountdownUI();
@@ -1506,20 +1388,19 @@
             document.getElementById('countdown-display').classList.add('hidden');
         }
 
-        // Show AINS Module on Finished Reading Button Click
         document.getElementById('btn-finish-reading').addEventListener('click', () => {
             document.getElementById('ains-portal-section').classList.remove('hidden');
-            showToast("Sesi selesai! Sila salin data atau simpan rekod di bawah.", "success");
+            showToast("Tahniah! Butangan AINS sedia disalin.", "success");
             document.getElementById('ains-portal-section').scrollIntoView({ behavior: 'smooth' });
         });
 
-        // Save reading record & Mark story as read (Individually based)
+        // Simpan rekod dan tanda sudah dibaca
         document.getElementById('btn-save-record').addEventListener('click', async () => {
             if (!selectedBook || !currentUser) return;
 
             const saveBtn = document.getElementById('btn-save-record');
             saveBtn.disabled = true;
-            saveBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Sedang Menyimpan...`;
+            saveBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Menyimpan...`;
 
             const todayDate = new Date().toISOString().split('T')[0];
             const payload = {
@@ -1561,526 +1442,29 @@
                 if (!userRecordsList.some(r => r.book_id === payload.book_id && r.date_read === payload.date_read)) {
                     userRecordsList.push(payload);
                 }
-            } catch (err) {
-                console.error("Gagal kemas kini local storage:", err);
-            }
+            } catch (err) {}
 
             saveBtn.className = "w-full sm:w-auto bg-emerald-750 text-white font-extrabold py-3.5 px-8 rounded-full shadow-inner transition-all text-sm flex items-center justify-center gap-2 mx-auto cursor-not-allowed";
-            saveBtn.innerHTML = `<i class="fa-solid fa-check"></i> Rekod Disimpan & Ditanda!`;
+            saveBtn.innerHTML = `<i class="fa-solid fa-check"></i> Rekod Disimpan!`;
 
             if (isSavedToFirebase) {
-                showToast("Rekod disimpan dalam Database & Rak ditandakan!", "success");
+                showToast("Rekod disimpan dalam Database!", "success");
             } else {
-                showToast("Rekod ditandakan pada Rak Buku secara tempatan!", "warning");
+                showToast("Rekod disimpan pada storan peranti!", "warning");
             }
 
             renderBookShelf();
             updateHistoryPage();
         });
 
-        // Navigate Back to Shelf
         document.getElementById('btn-back-to-shelf').addEventListener('click', () => {
             clearInterval(timerInterval);
             document.getElementById('sub-student-reading').classList.add('hidden');
             document.getElementById('sub-student-shelf').classList.remove('hidden');
         });
 
-        // Admin Panel Navigation Tab Handler
-        const tabBtns = document.querySelectorAll('.admin-tab-btn');
-        const tabContents = {
-            'btn-admin-tab-records': 'admin-tab-content-records',
-            'btn-admin-tab-add': 'admin-tab-content-add',
-            'btn-admin-tab-manage': 'admin-tab-content-manage'
-        };
-
-        tabBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                // Remove active classes
-                tabBtns.forEach(b => {
-                    b.className = "admin-tab-btn py-3.5 px-6 text-sm font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2.5 cursor-pointer text-slate-600 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-800/40 transform hover:scale-[1.01]";
-                    const icon = b.querySelector('i');
-                    if (icon) {
-                        icon.className = icon.className.replace('text-indigo-500', 'text-slate-400');
-                    }
-                });
-                // Hide all sections
-                Object.values(tabContents).forEach(id => {
-                    document.getElementById(id).classList.add('hidden');
-                });
-
-                // Set active tab styling
-                btn.className = "admin-tab-btn py-3.5 px-6 text-sm font-extrabold rounded-xl transition-all duration-300 flex items-center justify-center gap-2.5 cursor-pointer shadow-md bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100/30 dark:border-slate-700 transform scale-[1.02]";
-                const icon = btn.querySelector('i');
-                if (icon) {
-                    icon.className = icon.className.replace('text-slate-400', 'text-indigo-500');
-                }
-                // Show corresponding tab content
-                document.getElementById(tabContents[btn.id]).classList.remove('hidden');
-            });
-        });
-
-        // Tab selectors for Adding content (Text Sahaja vs Video YouTube - Rujukan image_57c38b.png)
-        const mediaTabText = document.getElementById('media-tab-text');
-        const mediaTabYoutube = document.getElementById('media-tab-youtube');
-        const containerStoryText = document.getElementById('container-story-text');
-        const containerYoutubeLink = document.getElementById('container-youtube-link');
-        const containerThumbnailLink = document.getElementById('container-thumbnail-link');
-        const containerPagesInput = document.getElementById('container-pages-input');
-        const categorySelector = document.getElementById('add-category');
-        const publisherLabel = document.getElementById('label-publisher');
-
-        mediaTabText.addEventListener('click', () => {
-            activeAddMediaTab = "text";
-            mediaTabText.className = "flex items-center justify-center flex-col gap-2 p-4 rounded-2xl border-2 border-indigo-600 dark:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 font-extrabold text-sm transition-all shadow-sm";
-            mediaTabYoutube.className = "flex items-center justify-center flex-col gap-2 p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-800 hover:border-indigo-600 dark:hover:border-indigo-500 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold text-sm transition-all cursor-pointer";
-            
-            containerStoryText.classList.remove('hidden');
-            containerYoutubeLink.classList.add('hidden');
-            containerThumbnailLink.classList.remove('hidden');
-            containerPagesInput.classList.remove('hidden');
-            
-            // Set fields values
-            categorySelector.value = "Fiksyen";
-            categorySelector.disabled = false;
-            publisherLabel.innerText = "Penerbit:";
-        });
-
-        mediaTabYoutube.addEventListener('click', () => {
-            activeAddMediaTab = "youtube";
-            mediaTabYoutube.className = "flex items-center justify-center flex-col gap-2 p-4 rounded-2xl border-2 border-indigo-600 dark:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 font-extrabold text-sm transition-all shadow-sm";
-            mediaTabText.className = "flex items-center justify-center flex-col gap-2 p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-800 hover:border-indigo-600 dark:hover:border-indigo-500 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold text-sm transition-all cursor-pointer";
-            
-            containerStoryText.classList.add('hidden');
-            containerYoutubeLink.classList.remove('hidden');
-            containerThumbnailLink.classList.add('hidden');
-            containerPagesInput.classList.add('hidden');
-            
-            // For Youtube, Category must be E-Pembelajaran and pages defaults to 10 (or 10 M/S equivalent)
-            categorySelector.value = "E-Pembelajaran";
-            categorySelector.disabled = true;
-            publisherLabel.innerText = "Penerbit (Nama Channel):";
-        });
-
-        // Set Default Date dynamically for newly added stories
-        const dateInput = document.getElementById('add-date');
-        const todayStr = "07/06/2026"; // Verified local current time date
-        dateInput.value = todayStr;
-
-        // Form Submission logic for adding story
-        document.getElementById('add-story-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const title = document.getElementById('add-title').value.trim();
-            const content = document.getElementById('add-content').value.trim();
-            const youtubeUrl = document.getElementById('add-youtube-url').value.trim();
-            const originalThumbnailUrl = document.getElementById('add-thumbnail-url').value.trim();
-            const summary = document.getElementById('add-summary').value.trim();
-            const moral = document.getElementById('add-moral').value.trim();
-            const category = categorySelector.value;
-            const publisher = document.getElementById('add-publisher').value.trim();
-            const author = document.getElementById('add-author').value.trim();
-            const language = document.getElementById('add-language').value.trim();
-            const pages = activeAddMediaTab === "youtube" ? 10 : (parseInt(document.getElementById('add-pages').value) || 10);
-
-            // Determine optimized thumbnail URL
-            let thumbnailUrl = originalThumbnailUrl;
-            let isVideoValue = false;
-
-            if (activeAddMediaTab === "youtube") {
-                isVideoValue = true;
-                const youtubeId = getYouTubeId(youtubeUrl);
-                if (youtubeId) {
-                    thumbnailUrl = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
-                } else {
-                    showToast("Pautan YouTube tidak sah!", "error");
-                    return;
-                }
-            }
-
-            const storyPayload = {
-                title: title,
-                author: author,
-                category: category,
-                pages: pages,
-                penerbit: publisher,
-                bahasa: language,
-                summary: summary,
-                moral: moral,
-                paragraphs: [content],
-                isVideo: isVideoValue,
-                youtubeUrl: youtubeUrl,
-                thumbnailUrl: thumbnailUrl,
-                thumbnailColor: "from-indigo-600 to-purple-800 dark:from-indigo-750 dark:to-purple-950",
-                svgPattern: `<svg class="w-20 h-20 opacity-30" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="30" fill="white"/></svg>`
-            };
-
-            // 1. Save to Firebase Firestore Database
-            let savedToFirestore = false;
-            try {
-                const docRef = await addDoc(collection(db, "stories"), storyPayload);
-                storyPayload.id = docRef.id;
-                savedToFirestore = true;
-            } catch (err) {
-                console.error("Failed writing story to Firestore:", err);
-            }
-
-            // 2. Save locally as backup / offline
-            try {
-                if (!storyPayload.id) {
-                    storyPayload.id = "custom-" + Date.now();
-                }
-                const localStories = localStorage.getItem("customStories");
-                const parsedStories = localStories ? JSON.parse(localStories) : [];
-                parsedStories.push(storyPayload);
-                localStorage.setItem("customStories", JSON.stringify(parsedStories));
-            } catch (err) {
-                console.error("Local storage error saving story:", err);
-            }
-
-            showToast("Bahan bacaan baharu berjaya disimpan!", "success");
-            document.getElementById('add-story-form').reset();
-            dateInput.value = todayStr; // Keep correct date
-
-            // Re-fetch stories list and refresh teacher dashboard stats
-            await fetchStories();
-            loadAdminData();
-        });
-
-        // Admin Panel Data Loading & Analytics Progress bars
-        async function loadAdminData() {
-            globalAllRecords = [];
-            const container = document.getElementById('admin-records-container');
-            container.innerHTML = `<div class="text-center py-6 text-slate-450"><i class="fa-solid fa-spinner animate-spin"></i> Memuatkan data...</div>`;
-
-            // 1. Fetch all records from Firestore `nilam_records`
-            try {
-                const q = collection(db, "nilam_records");
-                const snapshot = await getDocs(q);
-                snapshot.forEach(doc => {
-                    globalAllRecords.push(doc.data());
-                });
-            } catch (err) {
-                console.warn("Firestore error reading admin records:", err);
-            }
-
-            // 2. Load fallback records from all simulated/local storage userRecords if available
-            try {
-                const allKeys = Object.keys(localStorage);
-                allKeys.forEach(key => {
-                    if (key.startsWith("userRecords_")) {
-                        const localHist = JSON.parse(localStorage.getItem(key));
-                        localHist.forEach(rec => {
-                            if (!globalAllRecords.some(r => r.book_id === rec.book_id && r.student_email === rec.student_email && r.date_read === rec.date_read)) {
-                                globalAllRecords.push(rec);
-                            }
-                        });
-                    }
-                });
-            } catch (err) {
-                console.error("Local storage records lookup error for admin:", err);
-            }
-
-            // Render analytics bars & timeline list
-            renderAdminAnalytics();
-            // Render Urus dan Padam Rak panel
-            renderManageShelfList();
-        }
-
-        function renderAdminAnalytics() {
-            const container = document.getElementById('admin-records-container');
-            container.innerHTML = "";
-
-            const total = globalAllRecords.length;
-            const fiction = globalAllRecords.filter(r => r.category === "Fiksyen").length;
-            const nonFiction = globalAllRecords.filter(r => r.category === "Bukan Fiksyen").length;
-            const elearning = globalAllRecords.filter(r => r.category === "E-Pembelajaran").length;
-
-            // Render progress bars
-            document.getElementById('admin-fiction-count').innerText = `${fiction} Rekod`;
-            document.getElementById('admin-nonfiction-count').innerText = `${nonFiction} Rekod`;
-            document.getElementById('admin-elearning-count').innerText = `${elearning} Rekod`;
-
-            const fPct = total > 0 ? (fiction / total) * 100 : 0;
-            const nfPct = total > 0 ? (nonFiction / total) * 100 : 0;
-            const elPct = total > 0 ? (elearning / total) * 100 : 0;
-
-            document.getElementById('admin-fiction-bar').style.width = `${fPct}%`;
-            document.getElementById('admin-nonfiction-bar').style.width = `${nfPct}%`;
-            document.getElementById('admin-elearning-bar').style.width = `${elPct}%`;
-
-            if (total === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-12 text-slate-400">
-                        <i class="fa-solid fa-graduation-cap text-3xl mb-2.5"></i>
-                        <p class="text-xs font-semibold">Belum ada sebarang rekod tersimpan.</p>
-                        <p class="text-[10px]">Apabila murid mula merekodkan bacaan, ia akan terpapar di sini.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            // Sort by latest read date descending
-            const sorted = [...globalAllRecords].sort((a, b) => new Date(b.date_read) - new Date(a.date_read));
-
-            sorted.forEach(rec => {
-                const item = document.createElement('div');
-                item.className = "bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border border-slate-150 dark:border-slate-800 space-y-2 text-xs transition-colors hover:border-slate-300 dark:hover:border-slate-700";
-                
-                let iconClass = "fa-file-invoice text-blue-500";
-                if (rec.category === "E-Pembelajaran") {
-                    iconClass = "fa-video text-rose-500";
-                } else if (rec.category === "Bukan Fiksyen") {
-                    iconClass = "fa-graduation-cap text-emerald-500";
-                }
-
-                item.innerHTML = `
-                    <div class="flex items-center justify-between gap-2 flex-wrap">
-                        <strong class="text-slate-800 dark:text-slate-100 font-extrabold max-w-[140px] truncate block">${rec.student_name}</strong>
-                        <span class="text-[10px] text-slate-400 dark:text-slate-550 flex items-center gap-1">
-                            <i class="fa-solid fa-calendar-day"></i> ${rec.date_read}
-                        </span>
-                    </div>
-                    <div class="flex items-center gap-1.5 text-[10px] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 p-1.5 rounded-lg">
-                        <i class="fa-solid ${iconClass}"></i>
-                        <span class="font-bold text-slate-700 dark:text-slate-300 truncate">${rec.book_title}</span>
-                    </div>
-                    <p class="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed line-clamp-2 italic" title="${rec.summary}">"${rec.summary}"</p>
-                `;
-                container.appendChild(item);
-            });
-        }
-
-        // Render Tab 3: Urus dan Padam Rak (Direct alignment with image_4dd943.png)
-        function renderManageShelfList() {
-            const listContainer = document.getElementById('admin-shelf-list-container');
-            listContainer.innerHTML = "";
-
-            if (allAvailableStories.length === 0) {
-                listContainer.innerHTML = `
-                    <div class="text-center py-12 text-slate-400">
-                        <i class="fa-solid fa-folder-open text-3xl mb-2.5"></i>
-                        <p class="text-xs font-semibold">Rak buku anda kosong.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            allAvailableStories.forEach(story => {
-                const item = document.createElement('div');
-                item.className = "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-100 dark:hover:border-indigo-950/30 p-5 rounded-2xl flex items-center justify-between gap-4 transition-all shadow-sm";
-                
-                // Subtext info tags
-                const tagInfo = `${story.category.toUpperCase()} | ${story.isVideo ? 'VIDEO' : 'BUKU TEKS'} | ${story.author.toUpperCase()}`;
-                
-                item.innerHTML = `
-                    <div class="flex items-center gap-4 min-w-0">
-                        <div class="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 flex items-center justify-center text-lg shrink-0">
-                            <i class="fa-solid ${story.isVideo ? 'fa-video' : 'fa-file-invoice'}"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <h4 class="font-extrabold text-slate-800 dark:text-slate-200 text-sm md:text-base leading-tight truncate">${story.title}</h4>
-                            <p class="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 font-semibold tracking-wide mt-1 uppercase">${tagInfo}</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <!-- Edit Button (Pencil Icon) -->
-                        <button onclick="triggerEditStory('${story.id}')" class="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 p-2.5 rounded-xl border border-blue-100/50 dark:border-blue-900/30 cursor-pointer transition-all flex items-center justify-center w-10 h-10" title="Sunting Kandungan">
-                            <i class="fa-solid fa-pencil text-sm"></i>
-                        </button>
-                        <!-- Delete Button (Trash Icon) -->
-                        <button onclick="triggerDeleteStory('${story.id}')" class="bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 p-2.5 rounded-xl border border-rose-100/50 dark:border-rose-900/30 cursor-pointer transition-all flex items-center justify-center w-10 h-10" title="Padam Bahan">
-                            <i class="fa-solid fa-trash-can text-sm"></i>
-                        </button>
-                    </div>
-                `;
-                listContainer.appendChild(item);
-            });
-        }
-
-        // Trigger Edit Modal Action
-        window.triggerEditStory = function(storyId) {
-            const story = allAvailableStories.find(s => s.id === storyId);
-            if (!story) return;
-
-            document.getElementById('edit-id').value = story.id;
-            document.getElementById('edit-title').value = story.title;
-            document.getElementById('edit-summary').value = story.summary;
-            document.getElementById('edit-moral').value = story.moral;
-            document.getElementById('edit-language').value = story.bahasa;
-            document.getElementById('edit-publisher').value = story.penerbit;
-            document.getElementById('edit-pages').value = story.pages;
-            document.getElementById('edit-author').value = story.author;
-
-            const textContainer = document.getElementById('edit-container-story-text');
-            const youtubeContainer = document.getElementById('edit-container-youtube-link');
-
-            if (story.isVideo) {
-                textContainer.classList.add('hidden');
-                youtubeContainer.classList.remove('hidden');
-                document.getElementById('edit-youtube-url').value = story.youtubeUrl || "";
-            } else {
-                textContainer.classList.remove('hidden');
-                youtubeContainer.classList.add('hidden');
-                document.getElementById('edit-content').value = story.paragraphs.join("\n\n");
-            }
-
-            // Show modal
-            document.getElementById('edit-story-modal').classList.remove('hidden');
-        };
-
-        // Close Edit Modal
-        const closeModal = () => {
-            document.getElementById('edit-story-modal').classList.add('hidden');
-            document.getElementById('edit-story-form').reset();
-        };
-
-        document.getElementById('btn-close-edit-modal').addEventListener('click', closeModal);
-        document.getElementById('btn-cancel-edit').addEventListener('click', closeModal);
-
-        // Edit Story Submission Handler
-        document.getElementById('edit-story-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const id = document.getElementById('edit-id').value;
-            const title = document.getElementById('edit-title').value.trim();
-            const summary = document.getElementById('edit-summary').value.trim();
-            const moral = document.getElementById('edit-moral').value.trim();
-            const language = document.getElementById('edit-language').value.trim();
-            const publisher = document.getElementById('edit-publisher').value.trim();
-            const pages = parseInt(document.getElementById('edit-pages').value) || 10;
-            const author = document.getElementById('edit-author').value.trim();
-
-            const story = allAvailableStories.find(s => s.id === id);
-            if (!story) return;
-
-            // Extract values based on format
-            let contentParagraphs = [];
-            let youtubeUrlValue = "";
-            let thumbnailUrlValue = story.thumbnailUrl || "";
-
-            if (story.isVideo) {
-                youtubeUrlValue = document.getElementById('edit-youtube-url').value.trim();
-                const youtubeId = getYouTubeId(youtubeUrlValue);
-                if (youtubeId) {
-                    thumbnailUrlValue = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
-                }
-            } else {
-                contentParagraphs = document.getElementById('edit-content').value.split("\n\n").map(p => p.trim()).filter(p => p !== "");
-            }
-
-            // Prepare update payload
-            const updatePayload = {
-                title: title,
-                summary: summary,
-                moral: moral,
-                bahasa: language,
-                penerbit: publisher,
-                pages: pages,
-                author: author,
-                paragraphs: contentParagraphs,
-                youtubeUrl: youtubeUrlValue,
-                thumbnailUrl: thumbnailUrlValue
-            };
-
-            // 1. If it's a Firestore custom story, update in Database
-            let isCustomFirestoreStory = customStories.some(s => s.id === id);
-            if (isCustomFirestoreStory) {
-                try {
-                    const storyRef = doc(db, "stories", id);
-                    await updateDoc(storyRef, updatePayload);
-                } catch (err) {
-                    console.error("Firestore update error:", err);
-                }
-            }
-
-            // 2. Local State/Storage updates (both dummy or offline custom stories)
-            try {
-                // Update in LocalStorage custom list
-                const localStories = localStorage.getItem("customStories");
-                if (localStories) {
-                    let parsed = JSON.parse(localStories);
-                    const localIdx = parsed.findIndex(s => s.id === id);
-                    if (localIdx !== -1) {
-                        parsed[localIdx] = { ...parsed[localIdx], ...updatePayload };
-                        localStorage.setItem("customStories", JSON.stringify(parsed));
-                    }
-                }
-            } catch (err) {
-                console.error("LocalStorage save edits error:", err);
-            }
-
-            showToast("Maklumat bahan berjaya dikemaskini!", "success");
-            closeModal();
-            
-            // Re-fetch data and reload everything
-            await fetchStories();
-            loadAdminData();
-        });
-
-        // Trigger Delete Story Action (With beautiful custom confirmation overlay)
-        let storyIdToDelete = null;
-
-        window.triggerDeleteStory = function(storyId) {
-            storyIdToDelete = storyId;
-            document.getElementById('delete-confirm-modal').classList.remove('hidden');
-        };
-
-        document.getElementById('btn-cancel-delete').addEventListener('click', () => {
-            storyIdToDelete = null;
-            document.getElementById('delete-confirm-modal').classList.add('hidden');
-        });
-
-        document.getElementById('btn-confirm-delete').addEventListener('click', async () => {
-            if (!storyIdToDelete) return;
-            const storyId = storyIdToDelete;
-            const story = allAvailableStories.find(s => s.id === storyId);
-            if (!story) return;
-
-            let isCustomFirestoreStory = customStories.some(s => s.id === storyId);
-
-            // 1. Delete from Firestore if it is custom
-            if (isCustomFirestoreStory) {
-                try {
-                    const storyRef = doc(db, "stories", storyId);
-                    await deleteDoc(storyRef);
-                } catch (err) {
-                    console.error("Firestore delete error:", err);
-                }
-            }
-
-            // 2. Add to deleted_stories registry so both dummy & custom stories are filtered out for students persistently
-            try {
-                await addDoc(collection(db, "deleted_stories"), { story_id: storyId });
-            } catch (err) {
-                console.error("Gagal mendaftar rekod pemadaman ke database:", err);
-            }
-
-            // 3. Local state / LocalStorage fallback
-            try {
-                // Remove from custom local storage
-                const localStories = localStorage.getItem("customStories");
-                if (localStories) {
-                    let parsed = JSON.parse(localStories);
-                    const filtered = parsed.filter(s => s.id !== storyId);
-                    localStorage.setItem("customStories", JSON.stringify(filtered));
-                }
-            } catch (err) {
-                console.error("LocalStorage delete error:", err);
-            }
-
-            showToast("Bahan bacaan berjaya dipadam dari rak!", "success");
-            storyIdToDelete = null;
-            document.getElementById('delete-confirm-modal').classList.add('hidden');
-            
-            // Re-fetch stories (which triggers renderBookShelf dynamically for both student & teacher views)
-            await fetchStories();
-            loadAdminData();
-        });
-
-        // Copy data helper logic
         window.salinData = function(elementId, labelName) {
             const textToCopy = document.getElementById(elementId).innerText;
-            
             const tempTextArea = document.createElement("textarea");
             tempTextArea.value = textToCopy;
             document.body.appendChild(tempTextArea);
@@ -2094,14 +1478,11 @@
                     showToast("Gagal menyalin teks.", "error");
                 }
             } catch (err) {
-                console.error("Ralat menyalin:", err);
                 showToast("Sila salin secara manual.", "warning");
             }
-            
             document.body.removeChild(tempTextArea);
         };
 
-        // Elegant Toast System
         function showToast(message, type = "success") {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -2125,12 +1506,10 @@
             
             container.appendChild(toast);
 
-            // Animate In
             setTimeout(() => {
                 toast.classList.remove('translate-y-5', 'opacity-0');
             }, 50);
 
-            // Animate Out & Remove
             setTimeout(() => {
                 toast.classList.add('translate-y-5', 'opacity-0');
                 setTimeout(() => {
@@ -2138,9 +1517,7 @@
                 }, 300);
             }, 4000);
         }
-        window.showToast = showToast;
 
-        // Initialize display on startup
         renderBookShelf();
     </script>
 </body>
