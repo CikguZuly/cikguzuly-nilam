@@ -297,7 +297,7 @@
                                 
                                 <!-- Timer Display -->
                                 <div id="countdown-display" class="inline-flex items-center gap-2 bg-black/20 px-4 py-2 rounded-full text-sm font-semibold tracking-wider">
-                                    <i class="fa-solid fa-clock animate-spin"></i> Sila baca: <span id="timer-clock-text">05:00</span>
+                                    <i class="fa-solid fa-clock animate-spin"></i> Sila baca: <span id="timer-clock-text">10:00</span>
                                 </div>
 
                                 <!-- Action Buttons -->
@@ -305,11 +305,6 @@
                                     <!-- Finished Button -->
                                     <button id="btn-finish-reading" disabled class="w-full sm:w-auto bg-white text-[#f25c05] font-extrabold py-3 px-8 rounded-full shadow-md hover:bg-slate-50 transition-all disabled:bg-slate-200/50 disabled:dark:bg-slate-800/40 disabled:text-slate-450 disabled:dark:text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2">
                                         <i class="fa-regular fa-circle-check"></i> Saya Selesai Membaca Cerita
-                                    </button>
-
-                                    <!-- Teacher Hack Button -->
-                                    <button id="btn-skip-timer" class="w-full sm:w-auto bg-white/10 hover:bg-white/20 border border-white/20 text-white py-3 px-4 rounded-full text-xs font-semibold tracking-wide transition-all flex items-center justify-center gap-2 cursor-pointer">
-                                        <i class="fa-solid fa-bolt"></i> Pintas Pemasa (Khas Guru)
                                     </button>
                                 </div>
                             </div>
@@ -834,7 +829,7 @@
         // Global State & Data
         let customStories = []; // List of custom stories loaded dynamically from Firestore/LocalStorage
         let allAvailableStories = [...dummyStories]; // Merge dummy and custom stories
-        let timerDuration = 300; // 5 Minit
+        let timerDuration = 600; // 10 Minit
         let timerInterval = null;
         let selectedBook = null;
         let currentUser = null;
@@ -1402,7 +1397,7 @@
 
             // Reset Timer state
             clearInterval(timerInterval);
-            timerDuration = 300; // 5 Minit
+            timerDuration = 600; // 10 Minit
             updateCountdownUI();
 
             // Reset Save Button state
@@ -1442,11 +1437,6 @@
             document.getElementById('timer-clock-text').innerText = timeString;
         }
 
-        document.getElementById('btn-skip-timer').addEventListener('click', () => {
-            unlockReadingRecord();
-            showToast("Pemasa dipintas! Maklumat AINS sedia disalin.", "info");
-        });
-
         function unlockReadingRecord() {
             clearInterval(timerInterval);
             document.getElementById('timer-lock-icon').innerHTML = `<i class="fa-solid fa-lock-open text-emerald-300"></i>`;
@@ -1455,6 +1445,7 @@
             document.getElementById('countdown-display').classList.add('hidden');
         }
 
+        // Show AINS Module on Finished Reading Button Click
         document.getElementById('btn-finish-reading').addEventListener('click', () => {
             document.getElementById('ains-portal-section').classList.remove('hidden');
             showToast("Sesi selesai! Sila salin data atau simpan rekod di bawah.", "success");
