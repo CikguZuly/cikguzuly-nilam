@@ -28,6 +28,67 @@
                 },
             },
         }
+
+        // Enjin Mod Gelap Pintar (Utama: Sistem/PC, Pilihan: Manual)
+        window.toggleDarkMode = function() {
+            const current = localStorage.getItem('theme') || 'system';
+            let next = 'system';
+            if (current === 'system') {
+                next = 'light';
+                if (window.showToast) window.showToast("Mod Cerah diaktifkan secara manual", "info");
+            } else if (current === 'light') {
+                next = 'dark';
+                if (window.showToast) window.showToast("Mod Gelap diaktifkan secara manual", "info");
+            } else {
+                next = 'system';
+                if (window.showToast) window.showToast("Sistem diselaraskan semula mengikut tetapan PC / Browser (Automatik)", "info");
+            }
+            localStorage.setItem('theme', next);
+            window.applyTheme();
+        };
+
+        window.applyTheme = function() {
+            const savedTheme = localStorage.getItem('theme') || 'system';
+            if (savedTheme === 'system') {
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            } else if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+            window.updateDarkModeIcons();
+        };
+
+        window.updateDarkModeIcons = function() {
+            const savedTheme = localStorage.getItem('theme') || 'system';
+            document.querySelectorAll('.dark-mode-icon').forEach(icon => {
+                const button = icon.closest('button');
+                if (savedTheme === 'system') {
+                    icon.className = 'fa-solid fa-circle-half-stroke text-blue-500 dark:text-blue-400 dark-mode-icon text-sm';
+                    if (button) button.setAttribute('title', 'Mod: Automatik (Mengikut PC/Browser)');
+                } else if (savedTheme === 'dark') {
+                    icon.className = 'fa-solid fa-moon text-indigo-400 dark-mode-icon text-sm';
+                    if (button) button.setAttribute('title', 'Mod: Gelap (Kekal)');
+                } else {
+                    icon.className = 'fa-solid fa-sun text-amber-500 dark-mode-icon text-sm';
+                    if (button) button.setAttribute('title', 'Mod: Cerah (Kekal)');
+                }
+            });
+        };
+
+        // Dengar perubahan tetapan PC/Sistem secara langsung
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            if ((localStorage.getItem('theme') || 'system') === 'system') {
+                window.applyTheme();
+            }
+        });
+
+        // Jalankan serta-merta sebelum DOM dipaparkan bagi mengelakkan kelipan putih
+        window.applyTheme();
     </script>
     <style>
         body {
@@ -805,7 +866,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, query, where, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase configuration
         const firebaseConfig = {
@@ -823,8 +884,8 @@
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
 
-        // All static dummy stories removed completely to only show added database stories
-        const dummyStories = [];
+        // Global State & Data Dummy (6 Stories aligned with images & categories)
+        const dummyStories = [
 
         // Global State & Data
         let customStories = []; // List of custom stories loaded dynamically from Firestore/LocalStorage
@@ -863,16 +924,16 @@
 
         function updateDarkModeIcons() {
             const isDark = document.documentElement.classList.contains('dark');
-            document.querySelectorAll('.dark-mode-icon').forEach(icon => {
-                if (isDark) {
-                    icon.className = 'fa-solid fa-sun text-amber-400 dark-mode-icon text-sm';
-                } else {
-                    icon.className = 'fa-solid fa-moon text-slate-600 dark-mode-icon text-sm';
-                }
-            });
-        }
+        // UI States
+        let timerDuration = 600; // 10 Minit (600 Saat)
+        let timerInterval = null;
+        let selectedBook = null;
+        let currentUser = null;
+        let readBookIds = []; // Stores IDs of books read by currently logged in user
+        let userRecordsList = []; // Global array to hold history records for statistics
 
-        applyTheme();
+        // Sinkronisasikan paparan ikon sebaik sahaja modul sedia
+        window.applyTheme();
 
         // Screen Navigation Manager
         window.switchToScreen = function(screenId) {
@@ -2064,10 +2125,12 @@
             
             container.appendChild(toast);
 
+            // Animate In
             setTimeout(() => {
                 toast.classList.remove('translate-y-5', 'opacity-0');
             }, 50);
 
+            // Animate Out & Remove
             setTimeout(() => {
                 toast.classList.add('translate-y-5', 'opacity-0');
                 setTimeout(() => {
@@ -2075,9 +2138,10 @@
                 }, 300);
             }, 4000);
         }
+        window.showToast = showToast;
 
         // Initialize display on startup
-        fetchStories();
+        renderBookShelf();
     </script>
 </body>
 </html>
