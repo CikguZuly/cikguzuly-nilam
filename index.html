@@ -1,0 +1,1863 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rak Buku & Sumber Digital NILAM - SKUS</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Inter) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase Compat SDKs (Menjamin keserasian penuh pada file:// lokal dan GitHub Pages) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        slate: {
+                            750: '#1e293b',
+                            850: '#1e293b',
+                        }
+                    }
+                },
+            },
+        }
+
+        window.toggleDarkMode = function() {
+            const current = localStorage.getItem('theme') || 'system';
+            let next = 'system';
+            if (current === 'system') {
+                next = 'light';
+                if (window.showToast) window.showToast("Mod Cerah diaktifkan", "info");
+            } else if (current === 'light') {
+                next = 'dark';
+                if (window.showToast) window.showToast("Mod Gelap diaktifkan", "info");
+            } else {
+                next = 'system';
+                if (window.showToast) window.showToast("Sistem diselaraskan semula mengikut tetapan PC (Automatik)", "info");
+            }
+            localStorage.setItem('theme', next);
+            window.applyTheme();
+        };
+
+        window.applyTheme = function() {
+            const savedTheme = localStorage.getItem('theme') || 'system';
+            if (savedTheme === 'system') {
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            } else if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+            window.updateDarkModeIcons();
+        };
+
+        window.updateDarkModeIcons = function() {
+            const savedTheme = localStorage.getItem('theme') || 'system';
+            document.querySelectorAll('.dark-mode-icon').forEach(icon => {
+                const button = icon.closest('button');
+                if (savedTheme === 'system') {
+                    icon.className = 'fa-solid fa-circle-half-stroke text-blue-500 dark:text-blue-400 dark-mode-icon text-sm';
+                    if (button) button.setAttribute('title', 'Mod: Automatik (Mengikut PC)');
+                } else if (savedTheme === 'dark') {
+                    icon.className = 'fa-solid fa-moon text-indigo-400 dark-mode-icon text-sm';
+                    if (button) button.setAttribute('title', 'Mod: Gelap');
+                } else {
+                    icon.className = 'fa-solid fa-sun text-amber-500 dark-mode-icon text-sm';
+                    if (button) button.setAttribute('title', 'Mod: Cerah');
+                }
+            });
+        };
+
+        // Dengar perubahan tetapan sistem secara langsung
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            if ((localStorage.getItem('theme') || 'system') === 'system') {
+                window.applyTheme();
+            }
+        });
+
+        // Jalankan serta-merta bagi mengelakkan kelipan putih
+        window.applyTheme();
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #334155;
+        }
+    </style>
+</head>
+<body class="bg-[#f8fafc] text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen flex flex-col antialiased transition-colors duration-300">
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Floating Dark Mode Toggle (Skrin Login) -->
+    <div class="absolute top-5 right-5 z-40">
+        <button onclick="toggleDarkMode()" class="bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-md text-slate-600 dark:text-slate-350 cursor-pointer transition-all flex items-center justify-center w-10 h-10">
+            <i class="fa-solid fa-moon dark-mode-icon text-sm"></i>
+        </button>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 1. PAPARAN UTAMA: LOG MASUK (LOGIN SCREEN) -->
+    <!-- ========================================== -->
+    <div id="screen-login" class="flex-grow flex items-center justify-center p-4 min-h-screen bg-gradient-to-br from-amber-50 via-slate-50 to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800/80 p-8 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-32 h-32 bg-amber-100 dark:bg-amber-950/20 rounded-full -mr-16 -mt-16 opacity-50 blur-xl"></div>
+            <div class="absolute bottom-0 left-0 w-32 h-32 bg-blue-100 dark:bg-blue-950/20 rounded-full -ml-16 -mb-16 opacity-50 blur-xl"></div>
+
+            <div class="relative z-10">
+                <div class="text-center mb-8">
+                    <div class="inline-flex items-center justify-center w-16 h-16 bg-amber-500 rounded-2xl text-white text-3xl shadow-lg shadow-amber-500/30 mb-4">
+                        <i class="fa-solid fa-book-open-reader"></i>
+                    </div>
+                    <h1 class="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">Perpustakaan Digital</h1>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Sistem NILAM Pintar SKUS</p>
+                </div>
+
+                <!-- Tab Pemilihan Log Masuk -->
+                <div class="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl mb-6">
+                    <button id="tab-student" class="flex-1 py-2 text-sm font-semibold rounded-lg text-amber-700 dark:text-amber-300 bg-white dark:bg-slate-800 shadow-sm transition-all cursor-pointer">
+                        <i class="fa-solid fa-graduation-cap mr-1.5"></i>Murid
+                    </button>
+                    <button id="tab-admin" class="flex-1 py-2 text-sm font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-750 dark:hover:text-slate-300 transition-all cursor-pointer">
+                        <i class="fa-solid fa-user-shield mr-1.5"></i>Admin/Guru
+                    </button>
+                </div>
+
+                <!-- FORM MURID: Google Sign-In -->
+                <div id="form-student-container" class="space-y-4">
+                    <div class="bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30 rounded-xl p-4 text-center">
+                        <p class="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                            Murid-murid boleh menggunakan akaun <strong>Google DELIMa</strong> atau akaun Gmail peribadi untuk mula membaca dan merekod NILAM.
+                        </p>
+                    </div>
+                    <button id="btn-google-signin" class="w-full flex items-center justify-center gap-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 font-bold py-3.5 px-4 rounded-xl shadow-sm transition-all transform active:scale-95 text-sm cursor-pointer">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
+                        Log Masuk dengan Google
+                    </button>
+                </div>
+
+                <!-- FORM ADMIN: Username/Password -->
+                <div id="form-admin-container" class="space-y-4 hidden">
+                    <form id="admin-login-form" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">ID ADMIN</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
+                                    <i class="fa-solid fa-user text-xs"></i>
+                                </span>
+                                <input type="text" id="admin-username" required placeholder="" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-amber-500 focus:bg-white dark:focus:bg-slate-900 outline-none text-sm text-slate-800 dark:text-slate-100 transition-all">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">KATA LALUAN</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
+                                    <i class="fa-solid fa-lock text-xs"></i>
+                                </span>
+                                <input type="password" id="admin-password" required placeholder="" class="w-full pl-9 pr-10 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-amber-500 focus:bg-white dark:focus:bg-slate-900 outline-none text-sm text-slate-800 dark:text-slate-100 transition-all">
+                                <button type="button" id="btn-toggle-admin-password" class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400 focus:outline-none" title="Papar/Sembunyi Kata Laluan">
+                                    <i class="fa-solid fa-eye text-xs" id="admin-password-eye-icon"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all text-sm cursor-pointer">
+                            Log Masuk Admin
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 2. PAPARAN MURID (STUDENT SCREEN)          -->
+    <!-- ========================================== -->
+    <div id="screen-student" class="flex-grow flex flex-col hidden min-h-screen">
+        <nav class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-4 px-6 sticky top-0 z-40 shadow-sm transition-colors">
+            <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-md shadow-amber-500/20">
+                        <i class="fa-solid fa-book-open"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-extrabold text-slate-800 dark:text-slate-100 leading-tight">NILAM SKUS</h2>
+                        <p class="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                            Mod Murid Aktif
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3 w-full sm:w-auto justify-end flex-wrap">
+                    <button onclick="toggleDarkMode()" class="bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 transition-all text-slate-600 dark:text-slate-300 cursor-pointer flex items-center justify-center w-10 h-10">
+                        <i class="fa-solid fa-moon dark-mode-icon"></i>
+                    </button>
+
+                    <button id="btn-student-history" class="bg-indigo-50 hover:bg-indigo-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-indigo-600 dark:text-indigo-400 font-bold px-4 py-2.5 rounded-xl border border-indigo-100 dark:border-slate-800 transition-all text-xs flex items-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-clock-rotate-left"></i> 📜 Rekod Saya
+                    </button>
+
+                    <div class="flex items-center gap-2 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl p-1.5 pr-3">
+                        <img id="student-avatar" src="https://placehold.co/100x100/f59e0b/ffffff?text=M" alt="Avatar" class="w-8 h-8 rounded-lg object-cover">
+                        <div class="text-left">
+                            <p id="student-name" class="text-xs font-bold text-slate-800 dark:text-slate-100 max-w-[120px] truncate">Nama Murid</p>
+                            <p id="student-email" class="text-[10px] text-slate-500 dark:text-slate-400 max-w-[120px] truncate">murid@email.com</p>
+                        </div>
+                    </div>
+                    <button id="btn-student-logout" class="bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 font-bold p-2.5 rounded-xl border border-rose-100 dark:border-rose-900/30 transition-all cursor-pointer" title="Log Keluar">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+
+            <!-- SUB-PAGINATION 1: RAK BUKU & SUMBER DIGITAL NILAM -->
+            <div id="sub-student-shelf" class="space-y-6">
+                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+                    <div class="space-y-1">
+                        <h1 class="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">Rak Buku & Sumber Digital NILAM</h1>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">Pilih mana-mana bahan bacaan teks atau video cerita untuk mula belajar dan menjana rekod.</p>
+                    </div>
+
+                    <!-- Pencarian & Penapis Dinamik -->
+                    <div class="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto">
+                        <div class="relative w-full sm:w-64">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-550">
+                                <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                            </span>
+                            <input type="text" id="shelf-search" placeholder="Cari tajuk / pengarang..." class="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-amber-500 outline-none text-sm bg-slate-50 dark:bg-slate-850 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 transition-all">
+                        </div>
+                        <select id="shelf-filter" class="w-full sm:w-auto bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-sm focus:border-amber-500 outline-none cursor-pointer text-slate-800 dark:text-slate-100">
+                            <option value="Semua" class="dark:bg-slate-900 text-slate-800 dark:text-slate-100">Semua Kandungan</option>
+                            <option value="BelumDibaca" class="dark:bg-slate-900 text-slate-800 dark:text-slate-100">Belum Di Baca</option>
+                            <option value="SudahDibaca" class="dark:bg-slate-900 text-slate-800 dark:text-slate-100">Sudah Di Baca</option>
+                            <option value="Fiksyen" class="dark:bg-slate-900 text-slate-800 dark:text-slate-100">Fiksyen</option>
+                            <option value="Bukan Fiksyen" class="dark:bg-slate-900 text-slate-800 dark:text-slate-100">Bukan Fiksyen</option>
+                            <option value="E-Pembelajaran" class="dark:bg-slate-900 text-slate-800 dark:text-slate-100">E-Pembelajaran</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Grid Rak Buku -->
+                <div id="book-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Dinamik dipaparkan -->
+                </div>
+            </div>
+
+            <!-- SUB-PAGINATION 2: HALAMAN MEMBACA & TIMER -->
+            <div id="sub-student-reading" class="hidden space-y-6">
+                <button id="btn-back-to-shelf" class="inline-flex items-center gap-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-855 text-slate-700 dark:text-slate-300 font-bold px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all text-sm cursor-pointer">
+                    <i class="fa-solid fa-arrow-left"></i> Kembali ke Rak Buku
+                </button>
+
+                <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
+                    <div id="reading-cover-banner" class="h-48 md:h-64 flex flex-col items-center justify-center p-6 text-white relative">
+                        <div class="absolute inset-0 bg-black/15"></div>
+                        <div class="relative z-10 text-center space-y-2 max-w-2xl">
+                            <span id="reading-badge" class="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold tracking-wider uppercase">FIKSYEN</span>
+                            <h1 id="reading-title" class="text-2xl md:text-4xl font-extrabold tracking-tight">Sang Kancil dengan Tali Pinggang Raja</h1>
+                            <p id="reading-author" class="text-sm text-white/95">Oleh: Warisan Rakyat</p>
+                        </div>
+                    </div>
+
+                    <div class="p-6 md:p-10 max-w-4xl mx-auto space-y-6">
+                        <div class="flex items-center justify-between text-xs text-slate-400 dark:text-slate-550 border-b border-slate-100 dark:border-slate-800 pb-4">
+                            <span class="flex items-center gap-1"><i class="fa-solid fa-book-open"></i> Sesi Pembacaan / Pembelajaran Aktif</span>
+                            <span id="reading-pages-indicator"><i class="fa-solid fa-file-invoice"></i> Kandungan: 12 M/S</span>
+                        </div>
+
+                        <!-- Embedded Video Player / Placeholder for E-Pembelajaran (YouTube - Selesaikan Error 153) -->
+                        <div id="youtube-player-container" class="hidden space-y-4 mb-6">
+                            <a id="youtube-link-card" href="" target="_blank" class="block w-full aspect-video rounded-2xl overflow-hidden shadow-lg border border-slate-200 dark:border-slate-800 relative group cursor-pointer">
+                                <img id="youtube-thumbnail-placeholder" src="" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="Video Thumbnail">
+                                <div class="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/50 transition-all">
+                                    <div class="w-16 h-11 bg-[#FF0000] rounded-xl flex items-center justify-center text-white text-2xl shadow-lg group-hover:scale-110 transition-transform">
+                                        <i class="fa-solid fa-play"></i>
+                                    </div>
+                                </div>
+                            </a>
+                            <div class="text-center">
+                                <a id="youtube-external-btn" href="" target="_blank" class="inline-flex items-center gap-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-md transition-all transform active:scale-95 text-xs sm:text-sm cursor-pointer w-full justify-center sm:w-auto">
+                                    <i class="fa-brands fa-youtube text-base sm:text-lg"></i> Tonton Cerita/Video di YouTube (Sila Klik Sini)
+                                </a>
+                            </div>
+                        </div>
+
+                        <article id="story-paragraphs" class="text-slate-700 dark:text-slate-300 leading-relaxed text-justify text-base md:text-lg space-y-6">
+                            <!-- Kandungan cerita disuntik -->
+                        </article>
+
+                        <!-- Timer Block (Rujukan: image_58beab.png) -->
+                        <div id="timer-block" class="bg-gradient-to-br from-[#f25c05] to-[#e04f00] dark:from-orange-700 dark:to-orange-900 rounded-3xl p-6 md:p-8 text-white text-center shadow-lg shadow-orange-600/20 relative overflow-hidden mt-10 transition-all">
+                            <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/5 rounded-full"></div>
+                            
+                            <div class="relative z-10 max-w-lg mx-auto space-y-4">
+                                <div id="timer-lock-icon" class="inline-flex items-center justify-center w-12 h-12 bg-white/10 rounded-2xl text-xl animate-pulse">
+                                    <i class="fa-solid fa-lock"></i>
+                                </div>
+                                <h3 class="text-lg md:text-xl font-bold tracking-tight">Perlukan Pengesahan Pembacaan</h3>
+                                <p class="text-xs md:text-sm text-white/95 leading-relaxed">
+                                    Sila pastikan anda telah selesai membaca seluruh kisah/cerita teks atau menonton video di atas sebelum memapar maklumat NILAM untuk disalin.
+                                </p>
+                                
+                                <div id="countdown-display" class="inline-flex items-center gap-2 bg-black/20 px-4 py-2 rounded-full text-sm font-semibold tracking-wider">
+                                    <i class="fa-solid fa-clock animate-spin"></i> Sila baca: <span id="timer-clock-text">10:00</span>
+                                </div>
+
+                                <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                                    <button id="btn-finish-reading" disabled class="w-full sm:w-auto bg-white text-[#f25c05] font-extrabold py-3 px-8 rounded-full shadow-md hover:bg-slate-50 transition-all disabled:bg-slate-200/50 disabled:dark:bg-slate-800/40 disabled:text-slate-450 disabled:dark:text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2">
+                                        <i class="fa-regular fa-circle-check"></i> Saya Selesai Membaca Cerita
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AINS Copy Portal Section (Rujukan: image_58bb63.png) -->
+                        <div id="ains-portal-section" class="hidden space-y-8 pt-10 border-t border-slate-200 dark:border-slate-800">
+                            <div class="bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-900/30 rounded-2xl p-5 flex flex-col sm:flex-row items-start gap-3.5">
+                                <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white text-base">
+                                    <i class="fa-solid fa-file-circle-check"></i>
+                                </div>
+                                <div class="space-y-1">
+                                    <h3 class="text-sm font-bold text-blue-900 dark:text-blue-200 flex items-center gap-2">
+                                        📋 Salin Satu Persatu ke Portal AINS KPM
+                                    </h3>
+                                    <p class="text-xs text-blue-700/80 dark:text-blue-300/80 leading-relaxed">
+                                        Klik butang salin di sebelah setiap data di bawah untuk kemasukan satu persatu ke Portal NILAM AINS.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 rounded-2xl p-4 flex items-center justify-between shadow-sm transition-all group">
+                                    <div class="space-y-1 pr-2">
+                                        <p class="text-[10px] font-bold text-slate-400 dark:text-slate-505 tracking-wider uppercase">TAJUK CERITA</p>
+                                        <p id="ains-tajuk" class="text-sm font-extrabold text-slate-800 dark:text-slate-200 leading-tight"></p>
+                                    </div>
+                                    <button onclick="salinData('ains-tajuk', 'Tajuk Cerita')" class="shrink-0 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-950/30 hover:text-amber-700 dark:hover:text-amber-300 text-slate-600 dark:text-slate-300 font-bold py-1.5 px-3.5 rounded-xl text-xs transition-all cursor-pointer">
+                                        <i class="fa-regular fa-copy"></i> Salin
+                                    </button>
+                                </div>
+
+                                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 rounded-2xl p-4 flex items-center justify-between shadow-sm transition-all group">
+                                    <div class="space-y-1">
+                                        <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 tracking-wider uppercase">KATEGORI</p>
+                                        <p id="ains-kategori" class="text-sm font-extrabold text-slate-800 dark:text-slate-200 leading-tight"></p>
+                                    </div>
+                                    <button onclick="salinData('ains-kategori', 'Kategori')" class="shrink-0 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-950/30 hover:text-amber-700 dark:hover:text-amber-300 text-slate-600 dark:text-slate-300 font-bold py-1.5 px-3.5 rounded-xl text-xs transition-all cursor-pointer">
+                                        <i class="fa-regular fa-copy"></i> Salin
+                                    </button>
+                                </div>
+
+                                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 rounded-2xl p-4 flex items-center justify-between shadow-sm transition-all group">
+                                    <div class="space-y-1">
+                                        <p class="text-[10px] font-bold text-slate-400 dark:text-slate-550 tracking-wider uppercase">TARIKH BACAAN</p>
+                                        <p id="ains-tarikh" class="text-sm font-extrabold text-slate-800 dark:text-slate-200 leading-tight"></p>
+                                    </div>
+                                    <button onclick="salinData('ains-tarikh', 'Tarikh')" class="shrink-0 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-950/30 hover:text-amber-700 dark:hover:text-amber-300 text-slate-600 dark:text-slate-300 font-bold py-1.5 px-3.5 rounded-xl text-xs transition-all cursor-pointer">
+                                        <i class="fa-regular fa-copy"></i> Salin
+                                    </button>
+                                </div>
+
+                                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 rounded-2xl p-4 flex items-center justify-between shadow-sm transition-all group">
+                                    <div class="space-y-1">
+                                        <p class="text-[10px] font-bold text-slate-400 dark:text-slate-555 tracking-wider uppercase">BILANGAN MUKASURAT</p>
+                                        <p id="ains-mukasurat" class="text-sm font-extrabold text-slate-800 dark:text-slate-200 leading-tight"></p>
+                                    </div>
+                                    <button onclick="salinData('ains-mukasurat', 'Bilangan Mukasurat')" class="shrink-0 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-950/30 hover:text-amber-700 dark:hover:text-amber-300 text-slate-600 dark:text-slate-300 font-bold py-1.5 px-3.5 rounded-xl text-xs transition-all cursor-pointer">
+                                        <i class="fa-regular fa-copy"></i> Salin
+                                    </button>
+                                </div>
+
+                                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 rounded-2xl p-4 flex items-center justify-between shadow-sm transition-all group">
+                                    <div class="space-y-1 pr-2">
+                                        <p class="text-[10px] font-bold text-slate-400 dark:text-slate-555 tracking-wider uppercase">PENULIS</p>
+                                        <p id="ains-penulis" class="text-sm font-extrabold text-slate-800 dark:text-slate-200 leading-tight"></p>
+                                    </div>
+                                    <button onclick="salinData('ains-penulis', 'Penulis')" class="shrink-0 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-950/30 hover:text-amber-700 dark:hover:text-amber-300 text-slate-600 dark:text-slate-300 font-bold py-1.5 px-3.5 rounded-xl text-xs transition-all cursor-pointer">
+                                        <i class="fa-regular fa-copy"></i> Salin
+                                    </button>
+                                </div>
+
+                                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 rounded-2xl p-4 flex items-center justify-between shadow-sm transition-all group">
+                                    <div class="space-y-1 pr-2">
+                                        <p class="text-[10px] font-bold text-slate-400 dark:text-slate-555 tracking-wider uppercase">PENERBIT</p>
+                                        <p id="ains-penerbit" class="text-sm font-extrabold text-slate-800 dark:text-slate-200 leading-tight"></p>
+                                    </div>
+                                    <button onclick="salinData('ains-penerbit', 'Penerbit')" class="shrink-0 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-950/30 hover:text-amber-700 dark:hover:text-amber-300 text-slate-600 dark:text-slate-300 font-bold py-1.5 px-3.5 rounded-xl text-xs transition-all cursor-pointer">
+                                        <i class="fa-regular fa-copy"></i> Salin
+                                    </button>
+                                </div>
+
+                                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 rounded-2xl p-4 flex items-center justify-between shadow-sm transition-all group">
+                                    <div class="space-y-1">
+                                        <p class="text-[10px] font-bold text-slate-400 dark:text-slate-555 tracking-wider uppercase">BAHASA</p>
+                                        <p id="ains-bahasa" class="text-sm font-extrabold text-slate-800 dark:text-slate-200 leading-tight"></p>
+                                    </div>
+                                    <button onclick="salinData('ains-bahasa', 'Bahasa')" class="shrink-0 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-950/30 hover:text-amber-700 dark:hover:text-amber-300 text-slate-600 dark:text-slate-300 font-bold py-1.5 px-3.5 rounded-xl text-xs transition-all cursor-pointer">
+                                        <i class="fa-regular fa-copy"></i> Salin
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4">
+                                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 rounded-2xl p-5 shadow-sm transition-all">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div class="space-y-1.5 flex-grow">
+                                            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-555 tracking-wider uppercase">RUMUSAN CERITA</p>
+                                            <p id="ains-rumusan" class="text-sm font-bold text-indigo-700 dark:text-indigo-400 leading-relaxed text-justify"></p>
+                                        </div>
+                                        <button onclick="salinData('ains-rumusan', 'Rumusan')" class="shrink-0 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-950/30 hover:text-amber-700 dark:hover:text-amber-300 text-slate-600 dark:text-slate-300 font-bold py-1.5 px-3.5 rounded-xl text-xs transition-all cursor-pointer">
+                                            <i class="fa-regular fa-copy"></i> Salin
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 rounded-2xl p-5 shadow-sm transition-all">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div class="space-y-1.5 flex-grow">
+                                            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-555 tracking-wider uppercase">PENGAJARAN / NILAI MURNI</p>
+                                            <p id="ains-nilai" class="text-sm font-bold text-emerald-700 dark:text-emerald-400 leading-relaxed text-justify"></p>
+                                        </div>
+                                        <button onclick="salinData('ains-nilai', 'Pengajaran')" class="shrink-0 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-950/30 hover:text-amber-700 dark:hover:text-amber-300 text-slate-600 dark:text-slate-300 font-bold py-1.5 px-3.5 rounded-xl text-xs transition-all cursor-pointer">
+                                            <i class="fa-regular fa-copy"></i> Salin
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- SIMPAN REKOD SECTION -->
+                            <div class="bg-gradient-to-r from-emerald-500 to-teal-600 dark:from-emerald-600 dark:to-teal-700 rounded-3xl p-6 text-white text-center shadow-lg shadow-emerald-500/20 space-y-4 mt-8">
+                                <div class="inline-flex items-center justify-center w-12 h-12 bg-white/20 rounded-2xl text-xl">
+                                    <i class="fa-solid fa-floppy-disk"></i>
+                                </div>
+                                <h4 class="font-extrabold text-lg">Simpan Rekod ke Portfolio Anda</h4>
+                                <p class="text-xs text-emerald-100 max-w-md mx-auto">
+                                    Klik butang di bawah untuk merekodkan pembacaan ini ke dalam database sekolah anda secara individu dan menanda buku ini sebagai <strong>'Sudah Dibaca'</strong> pada Rak Buku anda.
+                                </p>
+                                <button id="btn-save-record" class="w-full sm:w-auto bg-white dark:bg-slate-100 text-emerald-600 dark:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-white font-extrabold py-3.5 px-8 rounded-full shadow-md transition-all transform active:scale-95 text-sm flex items-center justify-center gap-2 mx-auto cursor-pointer">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i> Simpan Rekod & Tanda "Sudah Dibaca"
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUB-PAGINATION 3: SEJARAH REKOD & STATISTIK MURID -->
+            <div id="sub-student-history" class="hidden space-y-6">
+                <button id="btn-back-history-to-shelf" class="inline-flex items-center gap-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-700 dark:text-slate-300 font-bold px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all text-sm cursor-pointer">
+                    <i class="fa-solid fa-arrow-left"></i> Kembali ke Rak Buku
+                </button>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-gradient-to-br from-amber-500 to-orange-600 dark:from-amber-600 dark:to-orange-700 rounded-3xl p-6 text-white shadow-lg shadow-orange-500/10 relative overflow-hidden">
+                        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-white/10 rounded-full"></div>
+                        <div class="relative z-10 space-y-2">
+                            <span class="text-xs font-bold uppercase tracking-wider opacity-90 flex items-center gap-1">
+                                <i class="fa-solid fa-book"></i> Jumlah Buku Dibaca
+                            </span>
+                            <h3 id="stats-total-books" class="text-4xl font-black">0</h3>
+                            <p class="text-[10px] opacity-75">Buku berjaya diselesaikan & direkod</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-blue-500 to-indigo-600 dark:from-blue-600 dark:to-indigo-700 rounded-3xl p-6 text-white shadow-lg shadow-blue-500/10 relative overflow-hidden">
+                        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-white/10 rounded-full"></div>
+                        <div class="relative z-10 space-y-2">
+                            <span class="text-xs font-bold uppercase tracking-wider opacity-90 flex items-center gap-1">
+                                <i class="fa-solid fa-feather-pointed"></i> Buku Fiksyen
+                            </span>
+                            <h3 id="stats-fiction-books" class="text-4xl font-black">0</h3>
+                            <p class="text-[10px] opacity-75">Koleksi cerita kreatif & dongeng</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-emerald-500 to-teal-600 dark:from-emerald-600 dark:to-teal-700 rounded-3xl p-6 text-white shadow-lg shadow-emerald-500/10 relative overflow-hidden">
+                        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-white/10 rounded-full"></div>
+                        <div class="relative z-10 space-y-2">
+                            <span class="text-xs font-bold uppercase tracking-wider opacity-90 flex items-center gap-1">
+                                <i class="fa-solid fa-graduation-cap"></i> Buku Bukan Fiksyen & E-Belajar
+                            </span>
+                            <h3 id="stats-nonfiction-books" class="text-4xl font-black">0</h3>
+                            <p class="text-[10px] opacity-75">Koleksi sains, sejarah, fakta & IT</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4 transition-colors">
+                    <div class="border-b border-slate-150 dark:border-slate-800 pb-4">
+                        <h3 class="text-lg font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                            <i class="fa-solid fa-rectangle-list text-amber-500"></i> Sejarah Rekod NILAM Saya
+                        </h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Papar senarai penuh maklumat rumusan cerita yang telah disimpan.</p>
+                    </div>
+
+                    <div id="history-records-list" class="space-y-4"></div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 3. PAPARAN GURU (ADMIN SCREEN)             -->
+    <!-- ========================================== -->
+    <div id="screen-admin" class="flex-grow flex flex-col hidden min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors">
+        <nav class="bg-slate-900 dark:bg-slate-950 text-white py-4 px-6 sticky top-0 z-40 shadow-md">
+            <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-md shadow-indigo-600/20">
+                        <i class="fa-solid fa-user-shield"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-extrabold leading-none">PORTAL GURU & ADMIN</h2>
+                        <p class="text-xs text-amber-400 font-medium mt-1">Sistem Pemantauan NILAM SKUS</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleDarkMode()" class="bg-slate-800 hover:bg-slate-755 p-2.5 rounded-xl border border-slate-750 transition-all text-slate-300 cursor-pointer flex items-center justify-center w-10 h-10">
+                        <i class="fa-solid fa-moon dark-mode-icon"></i>
+                    </button>
+                    <button id="btn-admin-logout" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-4 rounded-xl text-xs transition-all cursor-pointer">
+                        <i class="fa-solid fa-right-from-bracket mr-1"></i> Log Keluar Admin
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+            <!-- 3 Tab Cantik (Segmented Controls) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-100/80 dark:bg-slate-900 p-2 rounded-2xl mb-8 border border-slate-200/40 dark:border-slate-800/60 shadow-inner">
+                <button id="btn-admin-tab-records" class="admin-tab-btn py-3.5 px-6 text-sm font-extrabold rounded-xl transition-all duration-300 flex items-center justify-center gap-2.5 cursor-pointer shadow-md bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100/30 dark:border-slate-700/60 transform hover:scale-[1.01]">
+                    <i class="fa-solid fa-chart-line text-sm text-indigo-500"></i> REKOD BACAAN TERKINI
+                </button>
+                <button id="btn-admin-tab-add" class="admin-tab-btn py-3.5 px-6 text-sm font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2.5 cursor-pointer text-slate-600 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-800/40 transform hover:scale-[1.01]">
+                    <i class="fa-solid fa-plus-circle text-sm text-slate-400"></i> TAMBAH BACAAN
+                </button>
+                <button id="btn-admin-tab-manage" class="admin-tab-btn py-3.5 px-6 text-sm font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2.5 cursor-pointer text-slate-600 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-800/40 transform hover:scale-[1.01]">
+                    <i class="fa-solid fa-folder-open text-sm text-slate-400"></i> URUS DAN PADAM RAK
+                </button>
+            </div>
+
+            <!-- TAB 1: REKOD BACAAN TERKINI -->
+            <div id="admin-tab-content-records" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div class="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm space-y-4 transition-colors">
+                    <h3 class="text-base font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                        <i class="fa-solid fa-chart-pie text-indigo-500"></i> Perkembangan Bacaan Murid
+                    </h3>
+                    
+                    <div class="space-y-3.5 text-xs">
+                        <div>
+                            <div class="flex justify-between font-bold text-slate-600 dark:text-slate-400 mb-1">
+                                <span>Bahan Fiksyen</span>
+                                <span id="admin-fiction-count">0 Rekod</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                                <div id="admin-fiction-bar" class="bg-blue-500 h-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between font-bold text-slate-600 dark:text-slate-400 mb-1">
+                                <span>Bahan Bukan Fiksyen</span>
+                                <span id="admin-nonfiction-count">0 Rekod</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                                <div id="admin-nonfiction-bar" class="bg-emerald-500 h-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between font-bold text-slate-600 dark:text-slate-400 mb-1">
+                                <span>E-Pembelajaran (Video YouTube)</span>
+                                <span id="admin-elearning-count">0 Rekod</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                                <div id="admin-elearning-bar" class="bg-rose-500 h-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm space-y-4 transition-colors">
+                    <h3 class="text-base font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                        <i class="fa-solid fa-list-check text-emerald-500"></i> Rekod Bacaan Terkini Murid
+                    </h3>
+                    <div class="relative max-h-[450px] overflow-y-auto pr-1">
+                        <div id="admin-records-container" class="space-y-3.5">
+                            <!-- Dinamik disuntik -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: TAMBAH BACAAN -->
+            <div id="admin-tab-content-add" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 md:p-8 rounded-3xl shadow-sm space-y-6 transition-colors max-w-4xl mx-auto">
+                <div>
+                    <h3 class="text-lg font-extrabold text-slate-800 dark:text-slate-100">Tambah Bahan Bacaan Baharu</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Sediakan bahan bacaan teks atau video digital untuk diakses oleh murid secara terus.</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="media-tab-text" class="flex items-center justify-center flex-col gap-2 p-4 rounded-2xl border-2 border-indigo-600 dark:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 font-extrabold text-sm transition-all shadow-sm">
+                        <i class="fa-solid fa-file-invoice text-xl"></i> Teks Sahaja (Buku Cerita)
+                    </button>
+                    <button id="media-tab-youtube" class="flex items-center justify-center flex-col gap-2 p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-800 hover:border-indigo-600 dark:hover:border-indigo-500 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold text-sm transition-all cursor-pointer">
+                        <i class="fa-brands fa-youtube text-xl text-rose-500"></i> Video YouTube (E-Pembelajaran)
+                    </button>
+                </div>
+
+                <form id="add-story-form" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Tajuk Kandungan:</label>
+                        <input type="text" id="add-title" required placeholder="Contoh: Belajar Kitaran Air Semula Jadi" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all">
+                    </div>
+
+                    <div id="container-story-text">
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Kandungan Cerita (Teks):</label>
+                        <textarea id="add-content" rows="6" placeholder="Tulis teks cerita penuh anda di sini..." class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all"></textarea>
+                    </div>
+
+                    <div id="container-youtube-link" class="hidden">
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Pautan / Laman Web Video YouTube:</label>
+                        <input type="url" id="add-youtube-url" placeholder="Contoh: https://www.youtube.com/watch?v=dQw4w9WgXcQ" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all">
+                        <p class="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold mt-1 flex items-center gap-1">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Thumbnail akan dijana secara automatik daripada imej YouTube Khas.
+                        </p>
+                    </div>
+
+                    <div id="container-thumbnail-link">
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Pautan Thumbnail Grafik (Pilihan - URL Laman Web):</label>
+                        <input type="url" id="add-thumbnail-url" placeholder="Contoh: https://images.unsplash.com/... atau biarkan kosong" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Sinopsis Ringkas (AINS Format):</label>
+                        <textarea id="add-summary" rows="3" required placeholder="Tulis ringkasan ulasan (1-2 ayat)..." class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Nilai Murni & Pengajaran:</label>
+                        <input type="text" id="add-moral" required placeholder="Contoh: Menghormati guru membawa keberkatan ilmu..." class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Tarikh Penerbitan / Ditambah:</label>
+                            <input type="text" id="add-date" required class="w-full px-4 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl text-sm text-slate-800 dark:text-slate-300" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Bahasa:</label>
+                            <input type="text" id="add-language" required value="Bahasa Melayu" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:border-indigo-500 text-sm text-slate-800 dark:text-slate-100 transition-all">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Kategori Cerita / Video:</label>
+                            <select id="add-category" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none text-sm text-slate-800 dark:text-slate-100">
+                                <option value="Fiksyen">Fiksyen</option>
+                                <option value="Bukan Fiksyen">Bukan Fiksyen</option>
+                                <option value="E-Pembelajaran">E-Pembelajaran</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label id="label-publisher" class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Penerbit:</label>
+                            <input type="text" id="add-publisher" required value="CIKGU ZULY AI" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:border-indigo-500 text-sm text-slate-800 dark:text-slate-100 transition-all">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div id="container-pages-input">
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Bilangan Muka Surat:</label>
+                            <input type="number" id="add-pages" min="1" value="10" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:border-indigo-500 text-sm text-slate-800 dark:text-slate-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Nama Guru / Pengarang:</label>
+                            <input type="text" id="add-author" required placeholder="Contoh: Cikgu Sarah" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:border-indigo-500 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all">
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer text-sm">
+                            <i class="fa-regular fa-circle-check"></i> Simpan Kandungan Baharu ke Rak
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- TAB 3: URUS DAN PADAM RAK -->
+            <div id="admin-tab-content-manage" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 md:p-8 rounded-3xl shadow-sm space-y-6 transition-colors max-w-4xl mx-auto">
+                <div class="border-b border-slate-100 dark:border-slate-800 pb-4">
+                    <h3 class="text-xl font-extrabold text-slate-800 dark:text-slate-100">Pengurusan Rak Buku Perpustakaan</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Guru boleh menapis, menyunting kandungan, menjana semula poster, atau memadamkan bahan pengajaran kustom dari rak.</p>
+                </div>
+
+                <div id="admin-shelf-list-container" class="space-y-4">
+                    <!-- Dinamik disuntik mengikut rekaan visual image_4dd943.png -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Edit Story Overlay Modal -->
+    <div id="edit-story-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-2xl rounded-3xl shadow-2xl p-6 md:p-8 space-y-4 overflow-y-auto max-h-[90vh] transition-colors">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <h3 class="text-lg font-black text-slate-800 dark:text-slate-100">Kemaskini Bahan Bacaan</h3>
+                <button id="btn-close-edit-modal" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="edit-story-form" class="space-y-4 text-left">
+                <input type="hidden" id="edit-id">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Tajuk Kandungan:</label>
+                    <input type="text" id="edit-title" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none text-sm text-slate-850 dark:text-slate-100">
+                </div>
+                <div id="edit-container-story-text">
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Kandungan Cerita (Teks):</label>
+                    <textarea id="edit-content" rows="5" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none text-sm text-slate-850 dark:text-slate-100"></textarea>
+                </div>
+                <div id="edit-container-youtube-link" class="hidden">
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Pautan YouTube:</label>
+                    <input type="url" id="edit-youtube-url" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none text-sm text-slate-850 dark:text-slate-100">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Sinopsis Ringkas:</label>
+                    <textarea id="edit-summary" rows="2" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none text-sm text-slate-850 dark:text-slate-100"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Nilai Murni & Pengajaran:</label>
+                    <input type="text" id="edit-moral" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none text-sm text-slate-850 dark:text-slate-100">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Bahasa:</label>
+                        <input type="text" id="edit-language" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none text-sm text-slate-850 dark:text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Penerbit:</label>
+                        <input type="text" id="edit-publisher" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none text-sm text-slate-855 dark:text-slate-100">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Muka Surat:</label>
+                        <input type="number" id="edit-pages" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none text-sm text-slate-850 dark:text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Pengarang:</label>
+                        <input type="text" id="edit-author" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl outline-none text-sm text-slate-850 dark:text-slate-100">
+                    </div>
+                </div>
+                <div class="pt-2 flex justify-end gap-3">
+                    <button type="button" id="btn-cancel-edit" class="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-350 rounded-xl text-sm font-bold transition-all cursor-pointer">Batal</button>
+                    <button type="submit" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-black transition-all cursor-pointer">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Custom Delete Confirmation Modal -->
+    <div id="delete-confirm-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-md rounded-3xl shadow-2xl p-6 text-center space-y-5 transition-all transform duration-300">
+            <div class="w-16 h-16 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 rounded-full flex items-center justify-center text-2xl mx-auto">
+                <i class="fa-solid fa-triangle-exclamation animate-pulse"></i>
+            </div>
+            <div class="space-y-2">
+                <h3 class="text-lg font-black text-slate-800 dark:text-slate-100">Padam Bahan Bacaan?</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Adakah anda pasti untuk memadam bahan bacaan ini? Rekod yang dipadam tidak boleh dikembalikan semula ke rak perpustakaan.
+                </p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button id="btn-cancel-delete" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-bold transition-all cursor-pointer">
+                    Batal
+                </button>
+                <button id="btn-confirm-delete" class="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-black transition-all cursor-pointer">
+                    Ya, Padam!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Compat Script Core & App Init Logic -->
+    <script>
+        // Konfigurasi Kunci Firebase anda
+        const firebaseConfig = {
+            apiKey: "AIzaSyClpvvJ5gXhSvNixNv57C_iFpc_iHyXTnY",
+            authDomain: "perpustakaan-digital-cikgu-zul.firebaseapp.com",
+            projectId: "perpustakaan-digital-cikgu-zul",
+            storageBucket: "perpustakaan-digital-cikgu-zul.firebasestorage.app",
+            messagingSenderId: "347515220072",
+            appId: "1:347515220072:web:a57eef9f4ca18453ea0bdd"
+        };
+
+        // Inisialisasi Firebase & Perkhidmatan (Autonomi Fail-Safe)
+        let db, auth, provider;
+        let isFirebaseActive = false;
+
+        try {
+            if (typeof firebase !== 'undefined') {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                auth = firebase.auth();
+                provider = new firebase.auth.GoogleAuthProvider();
+                isFirebaseActive = true;
+                console.log("Firebase Compat SDK berjaya dimuatkan!");
+            } else {
+                console.warn("Firebase tidak dikesan. Aplikasi berjalan dalam mod Simulasi Keselamatan.");
+            }
+        } catch (e) {
+            console.error("Gagal menyambung ke pelayan Firebase. Mod Simulasi diaktifkan.", e);
+        }
+
+        // Global State
+        let customStories = [];
+        let allAvailableStories = [];
+        let timerDuration = 600; // 10 Minit (600 Saat)
+        let timerInterval = null;
+        let selectedBook = null;
+        let currentUser = null;
+        let readBookIds = [];
+        let userRecordsList = [];
+        let targetStoryIdToDelete = null;
+
+        // Tarikh semasa
+        const todayDateFormatted = "07/06/2026";
+        const todayISODate = "2026-06-07";
+
+        // Tab Pelawat Utama (Login)
+        document.getElementById('tab-student').addEventListener('click', () => {
+            document.getElementById('tab-student').className = "flex-1 py-2 text-sm font-semibold rounded-lg text-amber-700 dark:text-amber-300 bg-white dark:bg-slate-800 shadow-sm transition-all cursor-pointer";
+            document.getElementById('tab-admin').className = "flex-1 py-2 text-sm font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-755 dark:hover:text-slate-300 transition-all cursor-pointer";
+            document.getElementById('form-student-container').classList.remove('hidden');
+            document.getElementById('form-admin-container').classList.add('hidden');
+        });
+
+        document.getElementById('tab-admin').addEventListener('click', () => {
+            document.getElementById('tab-admin').className = "flex-1 py-2 text-sm font-semibold rounded-lg text-amber-700 dark:text-amber-300 bg-white dark:bg-slate-800 shadow-sm transition-all cursor-pointer";
+            document.getElementById('tab-student').className = "flex-1 py-2 text-sm font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-755 dark:hover:text-slate-300 transition-all cursor-pointer";
+            document.getElementById('form-admin-container').classList.remove('hidden');
+            document.getElementById('form-student-container').classList.add('hidden');
+        });
+
+        // Papar / Sembunyi Password Admin
+        document.getElementById('btn-toggle-admin-password').addEventListener('click', () => {
+            const pwdField = document.getElementById('admin-password');
+            const eyeIcon = document.getElementById('admin-password-eye-icon');
+            if (pwdField.type === "password") {
+                pwdField.type = "text";
+                eyeIcon.className = "fa-solid fa-eye-slash text-xs";
+            } else {
+                pwdField.type = "password";
+                eyeIcon.className = "fa-solid fa-eye text-xs";
+            }
+        });
+
+        // Tukar Skrin Paparan Utama
+        window.switchToScreen = function(screenId) {
+            document.getElementById('screen-login').classList.add('hidden');
+            document.getElementById('screen-student').classList.add('hidden');
+            document.getElementById('screen-admin').classList.add('hidden');
+            document.getElementById(screenId).classList.remove('hidden');
+        };
+
+        // Admin Login Form
+        document.getElementById('admin-login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = document.getElementById('admin-username').value.trim().replace(/\s+/g, '').toUpperCase();
+            const password = document.getElementById('admin-password').value.trim();
+
+            if (username === "SKUSADMIN" && password === "BBA4021") {
+                showToast("Selamat datang Cikgu! Log masuk berjaya.", "success");
+                switchToScreen('screen-admin');
+                initAdminDashboard();
+            } else {
+                showToast("ID Admin atau Kata Laluan adalah salah!", "error");
+            }
+        });
+
+        // Google Sign-In & Fail-safe Simulator
+        document.getElementById('btn-google-signin').addEventListener('click', async () => {
+            if (isFirebaseActive && auth) {
+                auth.signInWithPopup(provider).then((result) => {
+                    const user = result.user;
+                    showToast(`Selamat datang, ${user.displayName}!`, "success");
+                }).catch((error) => {
+                    console.warn("IFrame / CORS pelayar menghalang Firebase Auth. Memulakan mod simulasi automatik.", error);
+                    simulateStudentLogin();
+                });
+            } else {
+                simulateStudentLogin();
+            }
+        });
+
+        function simulateStudentLogin() {
+            const mockUser = {
+                displayName: "Ahmad Danish (Murid SKUS)",
+                email: "m-12345678@moe-dl.edu.my",
+                photoURL: "https://placehold.co/100x100/f59e0b/ffffff?text=AD"
+            };
+            currentUser = mockUser;
+            document.getElementById('student-name').innerText = mockUser.displayName;
+            document.getElementById('student-email').innerText = mockUser.email;
+            document.getElementById('student-avatar').src = mockUser.photoURL;
+            showToast("Log Masuk Murid diaktifkan!", "success");
+            switchToScreen('screen-student');
+            
+            fetchUserRecords(mockUser.email);
+        }
+
+        // Dengar Perubahan Authentication Firebase
+        if (isFirebaseActive && auth) {
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    currentUser = user;
+                    document.getElementById('student-name').innerText = user.displayName;
+                    document.getElementById('student-email').innerText = user.email;
+                    if (user.photoURL) {
+                        document.getElementById('student-avatar').src = user.photoURL;
+                    }
+                    switchToScreen('screen-student');
+                    fetchUserRecords(user.email);
+                } else {
+                    switchToScreen('screen-login');
+                }
+            });
+        }
+
+        // Keluar Murid & Guru
+        document.getElementById('btn-student-logout').addEventListener('click', () => {
+            if (isFirebaseActive && auth) {
+                auth.signOut().then(() => {
+                    resetStudentSession();
+                });
+            } else {
+                resetStudentSession();
+            }
+        });
+
+        document.getElementById('btn-admin-logout').addEventListener('click', () => {
+            showToast("Log keluar Admin berjaya.", "info");
+            switchToScreen('screen-login');
+        });
+
+        function resetStudentSession() {
+            currentUser = null;
+            readBookIds = [];
+            userRecordsList = [];
+            showToast("Berjaya log keluar.", "info");
+            switchToScreen('screen-login');
+        }
+
+        // Pemuatan Rekod & Bahan Bacaan Aktif Murid
+        async function fetchUserRecords(email) {
+            readBookIds = [];
+            userRecordsList = [];
+            
+            await fetchStories();
+
+            // 1. Dari Firestore (Online)
+            if (isFirebaseActive && db) {
+                try {
+                    const snap = await db.collection("nilam_records").where("student_email", "==", email).get();
+                    snap.forEach((doc) => {
+                        const data = doc.data();
+                        userRecordsList.push(data);
+                        if (data.book_id && !readBookIds.includes(data.book_id)) {
+                            readBookIds.push(data.book_id);
+                        }
+                    });
+                } catch (e) {
+                    console.warn("Gagal memuatkan rekod dalam talian:", e);
+                }
+            }
+
+            // 2. Dari LocalStorage (Offline / Backup)
+            try {
+                const localIds = localStorage.getItem(`readBookIds_${email}`);
+                if (localIds) {
+                    const parsed = JSON.parse(localIds);
+                    parsed.forEach(id => {
+                        if (!readBookIds.includes(id)) readBookIds.push(id);
+                    });
+                }
+
+                const localRecords = localStorage.getItem(`userRecords_${email}`);
+                if (localRecords) {
+                    const parsedRecs = JSON.parse(localRecords);
+                    parsedRecs.forEach(rec => {
+                        if (!userRecordsList.some(r => r.book_id === rec.book_id && r.date_read === rec.date_read)) {
+                            userRecordsList.push(rec);
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Gagal memuatkan simpanan lokal peranti:", e);
+            }
+
+            renderBookShelf();
+            updateHistoryPage();
+        }
+
+        // Memuatkan Buku Tersimpan & Mengasingkan Buku Terpadam
+        async function fetchStories() {
+            customStories = [];
+            let deletedIds = [];
+
+            // Muat senarai ID buku dipadam
+            if (isFirebaseActive && db) {
+                try {
+                    const deletedSnap = await db.collection("deleted_stories").get();
+                    deletedSnap.forEach((doc) => {
+                        deletedIds.push(doc.data().story_id);
+                    });
+                } catch (e) {
+                    console.warn(e);
+                }
+            }
+
+            // Muat senarai buku kustom dari database
+            if (isFirebaseActive && db) {
+                try {
+                    const snap = await db.collection("stories").get();
+                    snap.forEach((doc) => {
+                        const data = doc.data();
+                        const storyId = doc.id;
+                        if (!deletedIds.includes(storyId)) {
+                            customStories.push({
+                                id: storyId,
+                                title: data.title,
+                                author: data.author,
+                                category: data.category,
+                                pages: parseInt(data.pages) || 10,
+                                penerbit: data.penerbit || "Cikgu Zuly AI",
+                                bahasa: data.bahasa || "Bahasa Melayu",
+                                thumbnailUrl: data.thumbnailUrl || "",
+                                thumbnailColor: data.thumbnailColor || "from-slate-500 to-indigo-600 dark:from-slate-600 dark:to-indigo-800",
+                                svgPattern: data.svgPattern || `<svg class="w-20 h-20 opacity-30" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="30" fill="white"/></svg>`,
+                                summary: data.summary || "",
+                                moral: data.moral || "",
+                                paragraphs: Array.isArray(data.paragraphs) ? data.paragraphs : [data.paragraphs || ""],
+                                isVideo: data.isVideo || false,
+                                youtubeUrl: data.youtubeUrl || ""
+                            });
+                        }
+                    });
+                } catch (e) {
+                    console.warn(e);
+                }
+            }
+
+            // Muat dari localStorage sekiranya offline
+            try {
+                const localStories = localStorage.getItem("customStories");
+                if (localStories) {
+                    const parsed = JSON.parse(localStories);
+                    parsed.forEach(story => {
+                        if (!customStories.some(s => s.id === story.id) && !deletedIds.includes(story.id)) {
+                            customStories.push(story);
+                        }
+                    });
+                }
+            } catch (e) {}
+
+            allAvailableStories = [...customStories];
+            renderBookShelf();
+        }
+
+        // Saringan Rak Buku & Susunan Auto-Turun ke Bawah
+        function renderBookShelf() {
+            const search = document.getElementById('shelf-search').value.toLowerCase();
+            const filter = document.getElementById('shelf-filter').value;
+            const grid = document.getElementById('book-grid');
+            grid.innerHTML = "";
+
+            let filtered = allAvailableStories.filter(story => {
+                const matchesSearch = story.title.toLowerCase().includes(search) || story.author.toLowerCase().includes(search);
+                const isRead = readBookIds.includes(story.id);
+
+                let matchesFilter = true;
+                if (filter === "Semua") {
+                    matchesFilter = true;
+                } else if (filter === "BelumDibaca") {
+                    matchesFilter = !isRead;
+                } else if (filter === "SudahDibaca") {
+                    matchesFilter = isRead;
+                } else if (filter === "Fiksyen") {
+                    matchesFilter = story.category === "Fiksyen";
+                } else if (filter === "Bukan Fiksyen") {
+                    matchesFilter = story.category === "Bukan Fiksyen";
+                } else if (filter === "E-Pembelajaran") {
+                    matchesFilter = story.category === "E-Pembelajaran";
+                }
+                return matchesSearch && matchesFilter;
+            });
+
+            // Susun: Tolak buku yang sudah dibaca ke paling bawah rak
+            filtered.sort((a, b) => {
+                const aRead = readBookIds.includes(a.id);
+                const bRead = readBookIds.includes(b.id);
+                if (aRead && !bRead) return 1;
+                if (!aRead && bRead) return -1;
+                return 0;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 text-center text-slate-450 dark:text-slate-500 transition-colors">
+                        <i class="fa-solid fa-face-frown text-3xl mb-3 text-slate-450"></i>
+                        <p class="text-sm font-semibold">Tiada bahan bacaan aktif ditemui.</p>
+                        <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">Sila log masuk sebagai Admin untuk mula memuat naik bahan bacaan pertama sekolah anda.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filtered.forEach(story => {
+                const isRead = readBookIds.includes(story.id);
+                const card = document.createElement('div');
+                card.className = `bg-white dark:bg-slate-900 rounded-2xl border ${isRead ? 'border-emerald-300 dark:border-emerald-800/80 shadow-md' : 'border-slate-200 dark:border-slate-800'} shadow-sm overflow-hidden flex flex-col group hover:shadow-md transition-all relative`;
+                
+                let coverHtml = "";
+                if (story.isVideo && story.youtubeUrl) {
+                    const ytId = extractYouTubeId(story.youtubeUrl);
+                    const thumbUrl = ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : 'https://placehold.co/400x250/f43f5e/ffffff?text=Video+NILAM';
+                    coverHtml = `
+                        <img src="${thumbUrl}" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                        <div class="absolute inset-0 bg-black/40 flex items-center justify-center">
+                            <div class="w-14 h-10 bg-rose-600 rounded-lg flex items-center justify-center text-white text-lg"><i class="fa-solid fa-play"></i></div>
+                        </div>
+                    `;
+                } else if (story.thumbnailUrl) {
+                    coverHtml = `<img src="${story.thumbnailUrl}" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.onerror=null; this.src='https://placehold.co/400x250/2563eb/ffffff?text=${encodeURIComponent(story.title)}'">`;
+                } else {
+                    coverHtml = `
+                        <div class="absolute inset-0 bg-gradient-to-br ${story.thumbnailColor}"></div>
+                        <div class="relative z-10 flex flex-col items-center gap-4">
+                            ${story.svgPattern}
+                            <div class="bg-black/30 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/10">
+                                <h3 class="text-sm font-extrabold uppercase tracking-wider line-clamp-1">${story.title}</h3>
+                                <p class="text-[10px] text-white/80 font-medium">Oleh: ${story.author}</p>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    ${isRead ? `
+                    <div class="absolute top-3 right-3 bg-emerald-500/95 dark:bg-emerald-600/95 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1 z-20 animate-bounce">
+                        <i class="fa-solid fa-circle-check"></i> Sudah Dibaca
+                    </div>
+                    ` : ''}
+
+                    <div class="p-6 h-56 flex flex-col items-center justify-center relative overflow-hidden text-white text-center">
+                        ${coverHtml}
+                    </div>
+
+                    <div class="p-5 flex-grow flex flex-col justify-between space-y-4">
+                        <div class="space-y-2.5">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-bold tracking-wider uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-md">
+                                    ${story.category}
+                                </span>
+                            </div>
+                            <h4 class="font-extrabold text-slate-800 dark:text-slate-200 text-base leading-snug line-clamp-1">${story.title}</h4>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2">${story.summary}</p>
+                        </div>
+
+                        <div class="pt-3 border-t border-slate-100 dark:border-slate-850 flex items-center justify-between text-xs text-slate-400 dark:text-slate-550">
+                            <span>Kandungan: <strong class="text-slate-600 dark:text-slate-300 font-bold">${story.pages} M/S</strong></span>
+                            <button onclick="startReading('${story.id}')" class="${isRead ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/10' : 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/10'} text-white font-extrabold py-2 px-4 rounded-xl shadow-md transition-all flex items-center gap-1.5 text-xs cursor-pointer">
+                                ${isRead ? 'Baca Semula <i class="fa-solid fa-rotate-right text-[10px]"></i>' : 'Mula Belajar <i class="fa-solid fa-chevron-right text-[10px]"></i>'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // Mulakan Pembacaan & Sesi Pemasa 10 Minit (600 Saat)
+        window.startReading = function(storyId) {
+            selectedBook = allAvailableStories.find(s => s.id === storyId);
+            if (!selectedBook) return;
+
+            document.getElementById('reading-title').innerText = selectedBook.title;
+            document.getElementById('reading-author').innerText = `Oleh: ${selectedBook.author}`;
+            document.getElementById('reading-badge').innerText = selectedBook.category;
+            document.getElementById('reading-pages-indicator').innerHTML = `<i class="fa-solid fa-file-invoice"></i> Kandungan: ${selectedBook.pages} M/S`;
+
+            const banner = document.getElementById('reading-cover-banner');
+            if (selectedBook.thumbnailUrl) {
+                banner.className = "h-48 md:h-64 flex flex-col items-center justify-center p-6 text-white relative bg-slate-900";
+                banner.style.backgroundImage = `url('${selectedBook.thumbnailUrl}')`;
+                banner.style.backgroundSize = "cover";
+                banner.style.backgroundPosition = "center";
+            } else {
+                banner.style.backgroundImage = "none";
+                banner.className = `h-48 md:h-64 flex flex-col items-center justify-center p-6 text-white relative bg-gradient-to-br ${selectedBook.thumbnailColor}`;
+            }
+
+            // Sediakan visual YouTube jika ada
+            const ytContainer = document.getElementById('youtube-player-container');
+            if (selectedBook.isVideo && selectedBook.youtubeUrl) {
+                ytContainer.classList.remove('hidden');
+                const ytId = extractYouTubeId(selectedBook.youtubeUrl);
+                const thumbUrl = ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : '';
+                document.getElementById('youtube-thumbnail-placeholder').src = thumbUrl;
+                document.getElementById('youtube-link-card').href = selectedBook.youtubeUrl;
+                document.getElementById('youtube-external-btn').href = selectedBook.youtubeUrl;
+            } else {
+                ytContainer.classList.add('hidden');
+            }
+
+            // Pecahkan teks
+            const paragraphsBox = document.getElementById('story-paragraphs');
+            paragraphsBox.innerHTML = "";
+            selectedBook.paragraphs.forEach(text => {
+                const p = document.createElement('p');
+                p.className = "text-slate-700 dark:text-slate-300 leading-relaxed text-justify text-base md:text-lg";
+                p.innerText = text;
+                paragraphsBox.appendChild(p);
+            });
+
+            // Set Data Salinan AINS
+            document.getElementById('ains-tajuk').innerText = selectedBook.title;
+            document.getElementById('ains-kategori').innerText = selectedBook.category;
+            document.getElementById('ains-mukasurat').innerText = selectedBook.pages;
+            document.getElementById('ains-penulis').innerText = selectedBook.author;
+            document.getElementById('ains-penerbit').innerText = selectedBook.penerbit;
+            document.getElementById('ains-bahasa').innerText = selectedBook.bahasa;
+            document.getElementById('ains-rumusan').innerText = selectedBook.summary;
+            document.getElementById('ains-nilai').innerText = selectedBook.moral;
+            document.getElementById('ains-tarikh').innerText = todayISODate;
+
+            // Pemasa 10 Minit
+            clearInterval(timerInterval);
+            timerDuration = 600; // 10 Minit
+            updateCountdownUI();
+
+            document.getElementById('btn-save-record').disabled = false;
+            document.getElementById('btn-save-record').className = "w-full sm:w-auto bg-white dark:bg-slate-100 text-emerald-600 dark:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-white font-extrabold py-3.5 px-8 rounded-full shadow-md transition-all transform active:scale-95 text-sm flex items-center justify-center gap-2 mx-auto cursor-pointer";
+            document.getElementById('btn-save-record').innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Simpan Rekod & Tanda "Sudah Dibaca"`;
+
+            document.getElementById('btn-finish-reading').disabled = true;
+            document.getElementById('btn-finish-reading').className = "w-full sm:w-auto bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-600 font-extrabold py-3 px-8 rounded-full shadow-inner transition-all cursor-not-allowed text-sm flex items-center justify-center gap-2";
+            document.getElementById('timer-lock-icon').innerHTML = `<i class="fa-solid fa-lock animate-pulse"></i>`;
+            document.getElementById('countdown-display').classList.remove('hidden');
+            document.getElementById('ains-portal-section').classList.add('hidden');
+
+            document.getElementById('sub-student-shelf').classList.add('hidden');
+            document.getElementById('sub-student-history').classList.add('hidden');
+            document.getElementById('sub-student-reading').classList.remove('hidden');
+
+            timerInterval = setInterval(() => {
+                timerDuration--;
+                updateCountdownUI();
+
+                if (timerDuration <= 0) {
+                    unlockReadingRecord();
+                }
+            }, 1000);
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        function updateCountdownUI() {
+            const minutes = Math.floor(timerDuration / 60);
+            const seconds = timerDuration % 60;
+            const timeString = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            document.getElementById('timer-clock-text').innerText = timeString;
+        }
+
+        function unlockReadingRecord() {
+            clearInterval(timerInterval);
+            document.getElementById('timer-lock-icon').innerHTML = `<i class="fa-solid fa-lock-open text-emerald-300"></i>`;
+            document.getElementById('btn-finish-reading').disabled = false;
+            document.getElementById('btn-finish-reading').className = "w-full sm:w-auto bg-white text-[#f25c05] hover:bg-slate-50 font-extrabold py-3 px-8 rounded-full shadow-md transition-all transform active:scale-95 text-sm flex items-center justify-center gap-2 cursor-pointer";
+            document.getElementById('countdown-display').classList.add('hidden');
+        }
+
+        document.getElementById('btn-finish-reading').addEventListener('click', () => {
+            document.getElementById('ains-portal-section').classList.remove('hidden');
+            showToast("Tahniah! Butangan AINS sedia disalin.", "success");
+            document.getElementById('ains-portal-section').scrollIntoView({ behavior: 'smooth' });
+        });
+
+        // Simpan Rekod NILAM Individu
+        document.getElementById('btn-save-record').addEventListener('click', async () => {
+            if (!selectedBook || !currentUser) return;
+
+            const saveBtn = document.getElementById('btn-save-record');
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Menyimpan...`;
+
+            const payload = {
+                student_name: currentUser.displayName,
+                student_email: currentUser.email,
+                book_id: selectedBook.id,
+                book_title: selectedBook.title,
+                category: selectedBook.category,
+                pages: selectedBook.pages,
+                author: selectedBook.author,
+                penerbit: selectedBook.penerbit,
+                bahasa: selectedBook.bahasa,
+                summary: selectedBook.summary,
+                moral: selectedBook.moral,
+                date_read: todayISODate
+            };
+
+            let isSavedToFirebase = false;
+            if (isFirebaseActive && db) {
+                try {
+                    await db.collection("nilam_records").add(payload);
+                    isSavedToFirebase = true;
+                } catch (error) {
+                    console.error("Gagal simpan ke Firestore:", error);
+                }
+            }
+
+            try {
+                if (!readBookIds.includes(selectedBook.id)) {
+                    readBookIds.push(selectedBook.id);
+                }
+                localStorage.setItem(`readBookIds_${currentUser.email}`, JSON.stringify(readBookIds));
+
+                let localRecords = localStorage.getItem(`userRecords_${currentUser.email}`);
+                let parsedRecords = localRecords ? JSON.parse(localRecords) : [];
+                if (!parsedRecords.some(r => r.book_id === payload.book_id && r.date_read === payload.date_read)) {
+                    parsedRecords.push(payload);
+                }
+                localStorage.setItem(`userRecords_${currentUser.email}`, JSON.stringify(parsedRecords));
+
+                if (!userRecordsList.some(r => r.book_id === payload.book_id && r.date_read === payload.date_read)) {
+                    userRecordsList.push(payload);
+                }
+            } catch (err) {
+                console.error("LocalStorage error:", err);
+            }
+
+            saveBtn.className = "w-full sm:w-auto bg-emerald-700 text-white font-extrabold py-3.5 px-8 rounded-full shadow-inner transition-all text-sm flex items-center justify-center gap-2 mx-auto cursor-not-allowed";
+            saveBtn.innerHTML = `<i class="fa-solid fa-check"></i> Rekod Disimpan!`;
+
+            if (isSavedToFirebase) {
+                showToast("Rekod disimpan dalam Database!", "success");
+            } else {
+                showToast("Rekod disimpan pada storan peranti!", "warning");
+            }
+
+            renderBookShelf();
+            updateHistoryPage();
+        });
+
+        document.getElementById('btn-back-to-shelf').addEventListener('click', () => {
+            clearInterval(timerInterval);
+            document.getElementById('sub-student-reading').classList.add('hidden');
+            document.getElementById('sub-student-shelf').classList.remove('hidden');
+        });
+
+        // Tab Navigasi Sejarah Saya
+        document.getElementById('btn-student-history').addEventListener('click', () => {
+            document.getElementById('sub-student-shelf').classList.add('hidden');
+            document.getElementById('sub-student-reading').classList.add('hidden');
+            document.getElementById('sub-student-history').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        document.getElementById('btn-back-history-to-shelf').addEventListener('click', () => {
+            document.getElementById('sub-student-history').classList.add('hidden');
+            document.getElementById('sub-student-shelf').classList.remove('hidden');
+        });
+
+        function updateHistoryPage() {
+            const total = userRecordsList.length;
+            const fiction = userRecordsList.filter(r => r.category === "Fiksyen").length;
+            const nonFiction = userRecordsList.filter(r => r.category === "Bukan Fiksyen" || r.category === "E-Pembelajaran").length;
+
+            document.getElementById('stats-total-books').innerText = total;
+            document.getElementById('stats-fiction-books').innerText = fiction;
+            document.getElementById('stats-nonfiction-books').innerText = nonFiction;
+
+            const listContainer = document.getElementById('history-records-list');
+            listContainer.innerHTML = "";
+
+            if (total === 0) {
+                listContainer.innerHTML = `
+                    <div class="text-center p-12 text-slate-450 dark:text-slate-500">
+                        <i class="fa-solid fa-book-bookmark text-4xl mb-3"></i>
+                        <p class="text-sm font-medium">Tiada rekod pembacaan disimpan lagi.</p>
+                        <p class="text-xs mt-1">Mula membaca mana-mana buku di rak buku untuk rekod!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const sortedRecords = [...userRecordsList].sort((a, b) => new Date(b.date_read) - new Date(a.date_read));
+
+            sortedRecords.forEach(rec => {
+                const item = document.createElement('div');
+                item.className = "bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 rounded-2xl flex flex-col md:flex-row justify-between gap-4 transition-all";
+                item.innerHTML = `
+                    <div class="space-y-2.5 flex-grow">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-[10px] font-bold uppercase tracking-wider bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-0.5 rounded">
+                                ${rec.category}
+                            </span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 px-2.5 py-0.5 rounded flex items-center gap-1">
+                                <i class="fa-solid fa-calendar-day"></i> Dibaca pada: ${rec.date_read}
+                            </span>
+                        </div>
+                        <h4 class="font-extrabold text-slate-800 dark:text-slate-200 text-base leading-snug">${rec.book_title}</h4>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Oleh: <strong class="font-semibold">${rec.author}</strong> • Penerbit: ${rec.penerbit} (${rec.bahasa})</p>
+                        <div class="bg-white dark:bg-slate-850 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 leading-relaxed text-justify">
+                            <strong class="text-slate-800 dark:text-slate-200 block mb-1">Sinopsis/Rumusan:</strong> ${rec.summary}
+                        </div>
+                    </div>
+                    <div class="flex flex-row md:flex-col justify-between md:justify-start items-center md:items-end md:text-right shrink-0 gap-2 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 dark:border-slate-800">
+                        <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 rounded-full">
+                            <i class="fa-solid fa-circle-check"></i> Rekod Selamat
+                        </span>
+                        <span class="text-xs text-slate-450 dark:text-slate-505 font-medium">Halaman: ${rec.pages} M/S</span>
+                    </div>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        // ==========================================
+        // LOGIK PORTAL ADMIN / GURU (3 TAB UTAMA)
+        // ==========================================
+        const adminTabs = ['records', 'add', 'manage'];
+        adminTabs.forEach(tab => {
+            const btn = document.getElementById(`btn-admin-tab-${tab}`);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    adminTabs.forEach(t => {
+                        const content = document.getElementById(`admin-tab-content-${t}`);
+                        const tBtn = document.getElementById(`btn-admin-tab-${t}`);
+                        if (content) content.classList.add('hidden');
+                        if (tBtn) {
+                            tBtn.className = "admin-tab-btn py-3.5 px-6 text-sm font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2.5 cursor-pointer text-slate-600 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-800/40 transform hover:scale-[1.01]";
+                        }
+                    });
+
+                    document.getElementById(`admin-tab-content-${tab}`).classList.remove('hidden');
+                    btn.className = "admin-tab-btn py-3.5 px-6 text-sm font-extrabold rounded-xl transition-all duration-300 flex items-center justify-center gap-2.5 cursor-pointer shadow-md bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100/30 dark:border-slate-700/60 transform hover:scale-[1.01]";
+                });
+            }
+        });
+
+        // Inisialisasi Paparan Utama Admin
+        async function initAdminDashboard() {
+            document.getElementById('add-date').value = todayDateFormatted;
+            
+            // Muat semula senarai buku untuk pengurusan
+            await fetchStories();
+            renderAdminManageShelf();
+
+            // Ambil semua aktiviti bacaan terkini murid
+            if (isFirebaseActive && db) {
+                try {
+                    const recsSnap = await db.collection("nilam_records").get();
+                    const allRecs = [];
+                    recsSnap.forEach((doc) => {
+                        allRecs.push(doc.data());
+                    });
+
+                    // Perkembangan bar grafik admin
+                    const totalFiction = allRecs.filter(r => r.category === "Fiksyen").length;
+                    const totalNonFiction = allRecs.filter(r => r.category === "Bukan Fiksyen").length;
+                    const totalElearning = allRecs.filter(r => r.category === "E-Pembelajaran").length;
+                    const grandTotal = allRecs.length || 1;
+
+                    document.getElementById('admin-fiction-count').innerText = `${totalFiction} Rekod`;
+                    document.getElementById('admin-nonfiction-count').innerText = `${totalNonFiction} Rekod`;
+                    document.getElementById('admin-elearning-count').innerText = `${totalElearning} Rekod`;
+
+                    document.getElementById('admin-fiction-bar').style.width = `${(totalFiction / grandTotal) * 100}%`;
+                    document.getElementById('admin-nonfiction-bar').style.width = `${(totalNonFiction / grandTotal) * 100}%`;
+                    document.getElementById('admin-elearning-bar').style.width = `${(totalElearning / grandTotal) * 100}%`;
+
+                    // Aliran aktiviti stream admin
+                    const container = document.getElementById('admin-records-container');
+                    container.innerHTML = "";
+
+                    if (allRecs.length === 0) {
+                        container.innerHTML = `<p class="text-xs text-slate-400 text-center py-8">Tiada rekod pembacaan terkini dijumpai.</p>`;
+                        return;
+                    }
+
+                    allRecs.sort((a,b) => new Date(b.date_read) - new Date(a.date_read)).forEach(rec => {
+                        const item = document.createElement('div');
+                        item.className = "bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border border-slate-150 dark:border-slate-800 flex items-start justify-between gap-3 text-xs";
+                        item.innerHTML = `
+                            <div>
+                                <h4 class="font-extrabold text-slate-800 dark:text-slate-100">${rec.student_name}</h4>
+                                <p class="text-slate-450 dark:text-slate-400 text-[10px] mt-0.5">${rec.student_email} • Kelas: ${rec.class}</p>
+                                <p class="text-slate-700 dark:text-slate-300 font-semibold mt-2 flex items-center gap-1 text-[11px]"><i class="fa-solid fa-book-open text-amber-500"></i> ${rec.book_title} (${rec.category})</p>
+                            </div>
+                            <span class="text-[10px] font-bold text-slate-400 shrink-0">${rec.date_read}</span>
+                        `;
+                        container.appendChild(item);
+                    });
+
+                } catch (error) {
+                    console.error("Ralat memuatkan rekod admin:", error);
+                }
+            }
+        }
+
+        // Switcing Jenis Media Pembelajaran Tambah Buku (Teks vs YouTube)
+        const tabText = document.getElementById('media-tab-text');
+        const tabYT = document.getElementById('media-tab-youtube');
+        let isVideoSelected = false;
+
+        tabText.addEventListener('click', () => {
+            isVideoSelected = false;
+            tabText.className = "flex items-center justify-center flex-col gap-2 p-4 rounded-2xl border-2 border-indigo-600 dark:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 font-extrabold text-sm transition-all shadow-sm";
+            tabYT.className = "flex items-center justify-center flex-col gap-2 p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-800 hover:border-indigo-600 dark:hover:border-indigo-500 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold text-sm transition-all cursor-pointer";
+            document.getElementById('container-story-text').classList.remove('hidden');
+            document.getElementById('container-youtube-link').classList.add('hidden');
+            document.getElementById('container-thumbnail-link').classList.remove('hidden');
+            document.getElementById('container-pages-input').classList.remove('hidden');
+            document.getElementById('add-category').value = "Fiksyen";
+        });
+
+        tabYT.addEventListener('click', () => {
+            isVideoSelected = true;
+            tabYT.className = "flex items-center justify-center flex-col gap-2 p-4 rounded-2xl border-2 border-indigo-600 dark:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 font-extrabold text-sm transition-all shadow-sm";
+            tabText.className = "flex items-center justify-center flex-col gap-2 p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-800 hover:border-indigo-600 dark:hover:border-indigo-500 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold text-sm transition-all cursor-pointer";
+            document.getElementById('container-story-text').classList.add('hidden');
+            document.getElementById('container-youtube-link').classList.remove('hidden');
+            document.getElementById('container-thumbnail-link').classList.add('hidden');
+            document.getElementById('container-pages-input').classList.add('hidden');
+            document.getElementById('add-category').value = "E-Pembelajaran";
+        });
+
+        // Menambah Bahan Bacaan Baru
+        document.getElementById('add-story-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const title = document.getElementById('add-title').value.trim();
+            const content = document.getElementById('add-content').value.trim();
+            const youtubeUrl = document.getElementById('add-youtube-url').value.trim();
+            const thumbnailUrl = document.getElementById('add-thumbnail-url').value.trim();
+            const summary = document.getElementById('add-summary').value.trim();
+            const moral = document.getElementById('add-moral').value.trim();
+            const language = document.getElementById('add-language').value.trim();
+            const publisher = document.getElementById('add-publisher').value.trim();
+            const category = document.getElementById('add-category').value;
+            const pages = isVideoSelected ? 10 : (parseInt(document.getElementById('add-pages').value) || 10);
+            const author = document.getElementById('add-author').value.trim();
+
+            const newStory = {
+                title,
+                paragraphs: isVideoSelected ? ["Sila tonton cerita penuh melalui pautan video YouTube yang disediakan di bawah."] : content.split('\n\n'),
+                isVideo: isVideoSelected,
+                youtubeUrl: isVideoSelected ? youtubeUrl : "",
+                thumbnailUrl: isVideoSelected ? "" : thumbnailUrl,
+                summary,
+                moral,
+                bahasa: language,
+                penerbit: publisher,
+                category,
+                pages,
+                author,
+                date_added: todayISODate
+            };
+
+            let isSavedToFirebase = false;
+            if (isFirebaseActive && db) {
+                try {
+                    await db.collection("stories").add(newStory);
+                    isSavedToFirebase = true;
+                } catch (error) {
+                    console.error("Gagal simpan ke Firestore:", error);
+                }
+            }
+
+            // Local fallback backup
+            try {
+                const localStories = localStorage.getItem("customStories");
+                const parsed = localStories ? JSON.parse(localStories) : [];
+                newStory.id = isSavedToFirebase ? "" : `local-${Date.now()}`;
+                parsed.push(newStory);
+                localStorage.setItem("customStories", JSON.stringify(parsed));
+            } catch (err) {}
+
+            showToast("Bahan bacaan baharu berjaya disimpan!", "success");
+            document.getElementById('add-story-form').reset();
+            
+            // Segarkan semula data
+            initAdminDashboard();
+        });
+
+        // Menyusun Senarai Pengurusan Rak Buku Guru (Rujukan: image_4dd943.png)
+        function renderAdminManageShelf() {
+            const container = document.getElementById('admin-shelf-list-container');
+            container.innerHTML = "";
+
+            if (allAvailableStories.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400 text-center py-10">Tiada bahan di rak perpustakaan untuk diuruskan.</p>`;
+                return;
+            }
+
+            allAvailableStories.forEach(story => {
+                const item = document.createElement('div');
+                item.className = "bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border border-slate-150 dark:border-slate-800 flex items-center justify-between gap-4 transition-all shadow-sm";
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center text-lg">
+                            <i class="fa-solid fa-file-invoice"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-extrabold text-slate-800 dark:text-slate-100 text-sm leading-snug">${story.title}</h4>
+                            <p class="text-[10px] text-slate-450 dark:text-slate-400 font-bold tracking-wider uppercase mt-1">
+                                ${story.category} | BUKU TEKS | ${story.author}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="openEditModal('${story.id}')" class="p-2.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 rounded-xl transition-all cursor-pointer" title="Sunting">
+                            <i class="fa-solid fa-pencil text-sm"></i>
+                        </button>
+                        <button onclick="triggerDeleteStory('${story.id}')" class="p-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-450 rounded-xl transition-all cursor-pointer" title="Padam">
+                            <i class="fa-solid fa-trash-can text-sm"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // Memadam Bahan (Custom Warning Modal - Tiada Confirm Browser)
+        window.triggerDeleteStory = function(storyId) {
+            targetStoryIdToDelete = storyId;
+            document.getElementById('delete-confirm-modal').classList.remove('hidden');
+        };
+
+        document.getElementById('btn-cancel-delete').addEventListener('click', () => {
+            document.getElementById('delete-confirm-modal').classList.add('hidden');
+            targetStoryIdToDelete = null;
+        });
+
+        document.getElementById('btn-confirm-delete').addEventListener('click', async () => {
+            if (!targetStoryIdToDelete) return;
+
+            // 1. Catatkan ID ke dalam koleksi 'deleted_stories' di Firestore untuk penyelarasan murid secara real-time
+            if (isFirebaseActive && db) {
+                try {
+                    await db.collection("deleted_stories").add({
+                        story_id: targetStoryIdToDelete,
+                        date_deleted: todayISODate
+                    });
+                } catch (e) {
+                    console.error("Gagal mendaftarkan rekod padam di Firestore:", e);
+                }
+            }
+
+            // 2. Padam daripada Lokal peranti
+            try {
+                const localStories = localStorage.getItem("customStories");
+                if (localStories) {
+                    let parsed = JSON.parse(localStories);
+                    parsed = parsed.filter(story => story.id !== targetStoryIdToDelete);
+                    localStorage.setItem("customStories", JSON.stringify(parsed));
+                }
+            } catch (err) {}
+
+            showToast("Bahan berjaya dipadam daripada rak perpustakaan!", "success");
+            document.getElementById('delete-confirm-modal').classList.add('hidden');
+            targetStoryIdToDelete = null;
+
+            // Segarkan semula
+            initAdminDashboard();
+        });
+
+        // Menunting Bahan Bacaan
+        window.openEditModal = function(storyId) {
+            const story = allAvailableStories.find(s => s.id === storyId);
+            if (!story) return;
+
+            document.getElementById('edit-id').value = story.id;
+            document.getElementById('edit-title').value = story.title;
+            document.getElementById('edit-content').value = story.paragraphs.join('\n\n');
+            document.getElementById('edit-youtube-url').value = story.youtubeUrl || "";
+            document.getElementById('edit-summary').value = story.summary;
+            document.getElementById('edit-moral').value = story.moral;
+            document.getElementById('edit-language').value = story.bahasa;
+            document.getElementById('edit-publisher').value = story.penerbit;
+            document.getElementById('edit-pages').value = story.pages;
+            document.getElementById('edit-author').value = story.author;
+
+            if (story.isVideo) {
+                document.getElementById('edit-container-story-text').classList.add('hidden');
+                document.getElementById('edit-container-youtube-link').classList.remove('hidden');
+            } else {
+                document.getElementById('edit-container-story-text').classList.remove('hidden');
+                document.getElementById('edit-container-youtube-link').classList.add('hidden');
+            }
+
+            document.getElementById('edit-story-modal').classList.remove('hidden');
+        };
+
+        document.getElementById('btn-close-edit-modal').addEventListener('click', () => {
+            document.getElementById('edit-story-modal').classList.add('hidden');
+        });
+
+        document.getElementById('btn-cancel-edit').addEventListener('click', () => {
+            document.getElementById('edit-story-modal').classList.add('hidden');
+        });
+
+        document.getElementById('edit-story-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const id = document.getElementById('edit-id').value;
+            const title = document.getElementById('edit-title').value.trim();
+            const content = document.getElementById('edit-content').value.trim();
+            const youtubeUrl = document.getElementById('edit-youtube-url').value.trim();
+            const summary = document.getElementById('edit-summary').value.trim();
+            const moral = document.getElementById('edit-moral').value.trim();
+            const language = document.getElementById('edit-language').value.trim();
+            const publisher = document.getElementById('edit-publisher').value.trim();
+            const pages = parseInt(document.getElementById('edit-pages').value) || 10;
+            const author = document.getElementById('edit-author').value.trim();
+
+            const story = allAvailableStories.find(s => s.id === id);
+            if (!story) return;
+
+            const updatedData = {
+                title,
+                paragraphs: story.isVideo ? ["Sila tonton cerita penuh melalui pautan video YouTube yang disediakan di bawah."] : content.split('\n\n'),
+                youtubeUrl: story.isVideo ? youtubeUrl : "",
+                summary,
+                moral,
+                bahasa: language,
+                penerbit: publisher,
+                pages,
+                author
+            };
+
+            // 1. Simpan di Firestore (Online)
+            if (isFirebaseActive && db && !id.startsWith('local-')) {
+                try {
+                    await db.collection("stories").doc(id).update(updatedData);
+                } catch (error) {
+                    console.error("Gagal kemaskini di Firestore:", error);
+                }
+            }
+
+            // 2. Simpan lokal peranti
+            try {
+                const localStories = localStorage.getItem("customStories");
+                if (localStories) {
+                    let parsed = JSON.parse(localStories);
+                    parsed = parsed.map(s => {
+                        if (s.id === id) {
+                            return { ...s, ...updatedData };
+                        }
+                        return s;
+                    });
+                    localStorage.setItem("customStories", JSON.stringify(parsed));
+                }
+            } catch (err) {}
+
+            showToast("Bahan bacaan berjaya dikemaskini!", "success");
+            document.getElementById('edit-story-modal').classList.add('hidden');
+            
+            // Segarkan semula
+            initAdminDashboard();
+        });
+
+        // Helper: Ekstrak ID YouTube
+        function extractYouTubeId(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+
+        // Helper: Toast Notifikasi
+        function showToast(message, type = "success") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = "bg-emerald-500 text-white";
+            let icon = "fa-circle-check";
+            
+            if (type === "error") {
+                bgClass = "bg-rose-500 text-white";
+                icon = "fa-circle-xmark";
+            } else if (type === "info") {
+                bgClass = "bg-blue-500 text-white";
+                icon = "fa-circle-info";
+            } else if (type === "warning") {
+                bgClass = "bg-amber-500 text-slate-900";
+                icon = "fa-triangle-exclamation";
+            }
+
+            toast.className = `${bgClass} flex items-center gap-2.5 py-3 px-5 rounded-2xl shadow-lg text-xs font-bold transition-all duration-300 transform translate-y-5 opacity-0 pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+            
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-5', 'opacity-0');
+            }, 50);
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-5', 'opacity-0');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 4000);
+        }
+
+        // Permulaan Rak Buku
+        renderBookShelf();
+    </script>
+</body>
+</html>
