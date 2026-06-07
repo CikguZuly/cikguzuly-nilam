@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Membaca & NILAM Pintar</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        body { font-family: 'Comic Sans MS', cursive, sans-serif; }
+    </style>
+</head>
+<body class="bg-amber-50 text-gray-800 p-4">
+
+    <div class="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-6 border-4 border-amber-300">
+        <header class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-amber-600">📖 Jom Baca & NILAM!</h1>
+            <p class="text-sm text-gray-500">Membaca Jambatan Ilmu</p>
+        </header>
+
+        <section id="story-section" class="mb-8 bg-blue-50 p-4 rounded-xl border-2 border-blue-200">
+            <h2 id="story-title" class="text-xl font-bold text-blue-700 mb-2">Memuatkan cerita...</h2>
+            <p id="story-content" class="text-gray-700 leading-relaxed text-justify mb-4"> Sila tunggu sebentar, cerita menarik sedang disediakan untuk anda.</p>
+            <div class="bg-yellow-100 p-2 rounded text-xs text-amber-800 font-semibold" id="story-moral">
+                Nilai Murni: -
+            </div>
+        </section>
+
+        <hr class="border-dashed border-amber-300 my-6">
+
+        <section id="nilam-section">
+            <h3 class="text-lg font-bold text-emerald-600 mb-3">📝 Rekod NILAM Murid</h3>
+            
+            <form id="nilamForm" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-gray-600">Nama Murid:</label>
+                    <input type="text" id="studentName" required class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-emerald-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600">Kelas:</label>
+                    <input type="text" id="studentClass" required class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-emerald-500 outline-none" placeholder="Contoh: 1 Gemilang">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600">Tajuk Buku / Cerita:</label>
+                    <input type="text" id="bookTitle" required class="w-full p-2 border-2 border-gray-300 rounded-lg bg-gray-100" readonly>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600">Rumusan / Sinopsis Pendek:</label>
+                    <textarea id="synopsis" rows="3" required class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-emerald-500 outline-none" placeholder="Tuliskan 1 atau 2 ayat tentang apa yang kamu faham..."></textarea>
+                </div>
+
+                <button type="submit" class="w-full bg-emerald-500 text-white font-bold p-3 rounded-xl shadow-md hover:bg-emerald-600 transition-colors transform active:scale-95">
+                    🚀 Hantar Rekod NILAM
+                </button>
+            </form>
+        </section>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
